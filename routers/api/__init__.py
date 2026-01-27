@@ -1,0 +1,77 @@
+"""
+API Router Module
+=================
+
+Main API router that combines all sub-routers for the application.
+
+This module imports and registers all API endpoint routers, including:
+- Diagram generation and management
+- File operations
+- Frontend logging
+- Knowledge Space operations
+- And other feature-specific routers
+"""
+import logging
+
+from fastapi import APIRouter
+
+from config.settings import config as app_config
+
+from . import (
+    diagram_generation,
+    png_export,
+    sse_streaming,
+    llm_operations,
+    frontend_logging,
+    layout,
+    feedback,
+    dify_files,
+    dify_conversations,
+    image_proxy,
+    diagrams,
+)
+from . import config
+
+logger = logging.getLogger(__name__)
+
+knowledge_space_module = None
+if app_config.FEATURE_KNOWLEDGE_SPACE:
+    try:
+        from . import knowledge_space as knowledge_space_module
+    except Exception as e:
+        knowledge_space_module = None
+        logger.debug("[API] Failed to import knowledge_space router: %s", e, exc_info=True)
+else:
+    logger.debug("[API] Knowledge Space feature disabled via FEATURE_KNOWLEDGE_SPACE flag")
+
+# Create main router with prefix and tags
+router = APIRouter(prefix="/api", tags=["api"])
+
+# Include all sub-routers
+router.include_router(config.router)
+router.include_router(diagram_generation.router)
+router.include_router(png_export.router)
+router.include_router(sse_streaming.router)
+router.include_router(llm_operations.router)
+router.include_router(frontend_logging.router)
+router.include_router(layout.router)
+router.include_router(feedback.router)
+router.include_router(dify_files.router)
+router.include_router(dify_conversations.router)
+router.include_router(image_proxy.router)
+router.include_router(diagrams.router)
+
+# Knowledge Space router (has its own prefix)
+if knowledge_space_module is not None:
+    router.include_router(knowledge_space_module.router)
+    logger.info("[API] Knowledge Space router registered at /api/knowledge-space")
+else:
+    if app_config.FEATURE_KNOWLEDGE_SPACE:
+        logger.warning(
+            "[API] Knowledge Space router NOT registered - import failed or router is None. "
+            "Check DEBUG logs for details. This may be due to missing dependencies (Qdrant, Celery)."
+        )
+    else:
+        logger.debug("[API] Knowledge Space router NOT registered - feature disabled")
+
+__all__ = ["router"]

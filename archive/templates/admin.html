@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindGraph 管理后台 | Admin Panel</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/fonts/inter.css?v={{ version }}">
+    <link rel="stylesheet" href="/static/css/admin.css?v={{ version }}">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <h1>🎓 MindGraph <span class="lang-zh">管理后台</span><span class="lang-en">Admin Panel</span><span class="lang-az">İdarə Paneli</span></h1>
+                <button class="lang-toggle" onclick="toggleLanguage()" id="langToggle">
+                    <span class="lang-en">中文</span>
+                    <span class="lang-zh">AZ</span>
+                    <span class="lang-az">EN</span>
+                </button>
+            </div>
+            <div class="user-info">
+                <span id="adminName">Admin</span>
+                <button class="btn btn-secondary btn-sm" onclick="window.location.href='/editor'">
+                    <span class="lang-zh">图库</span>
+                    <span class="lang-en">Gallery</span>
+                    <span class="lang-az">Qalereya</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="logout()">
+                    <span class="lang-zh">登出</span>
+                    <span class="lang-en">Logout</span>
+                    <span class="lang-az">Çıxış</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Alert -->
+        <div id="alert" class="alert"></div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard', this)"><span class="lang-zh">仪表盘</span><span class="lang-en">Dashboard</span><span class="lang-az">İdarə Paneli</span></button>
+            <button class="tab" data-tab="tokens" onclick="switchTab('tokens', this)"><span class="lang-zh">Token统计</span><span class="lang-en">Tokens</span><span class="lang-az">Tokenlar</span></button>
+            <button class="tab" data-tab="schools" onclick="switchTab('schools', this)"><span class="lang-zh">学校管理</span><span class="lang-en">Schools</span><span class="lang-az">Məktəblər</span></button>
+            <button class="tab" data-tab="users" onclick="switchTab('users', this)"><span class="lang-zh">用户管理</span><span class="lang-en">Users</span><span class="lang-az">İstifadəçilər</span></button>
+            <button class="tab" data-tab="apikeys" onclick="switchTab('apikeys', this)"><span class="lang-zh">API密钥</span><span class="lang-en">API Keys</span><span class="lang-az">API Açarları</span></button>
+            <button class="tab" data-tab="announcement" onclick="switchTab('announcement', this)"><span class="lang-zh">更新公告</span><span class="lang-en">Announcement</span><span class="lang-az">Elan</span></button>
+            <button class="tab" data-tab="realtime" onclick="switchTab('realtime', this)"><span class="lang-zh">实时监控</span><span class="lang-en">Realtime</span><span class="lang-az">Real Vaxt</span></button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card" data-metric="users" onclick="showTrendChart('users', this)">
+                    <h3><span class="lang-zh">总用户数</span><span class="lang-en">Total Users</span><span class="lang-az">Ümumi İstifadəçilər</span></h3>
+                    <div class="value" id="stat-users">-</div>
+                </div>
+                <div class="stat-card" data-metric="organizations" onclick="showTrendChart('organizations', this)">
+                    <h3><span class="lang-zh">学校数量</span><span class="lang-en">Organizations</span><span class="lang-az">Təşkilatlar</span></h3>
+                    <div class="value" id="stat-orgs">-</div>
+                </div>
+                <div class="stat-card" data-metric="registrations" onclick="showTrendChart('registrations', this)">
+                    <h3><span class="lang-zh">今日注册</span><span class="lang-en">Today</span><span class="lang-az">Bu Gün</span></h3>
+                    <div class="value" id="stat-recent">-</div>
+                </div>
+                <div class="stat-card" data-metric="tokens" onclick="showTrendChart('tokens', this)">
+                    <h3><span class="lang-zh">总Token使用</span><span class="lang-en">Total Tokens</span><span class="lang-az">Ümumi Tokenlar</span></h3>
+                    <div class="value" id="stat-tokens">-</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">🏆 <span class="lang-zh">活跃学校排行榜 (按总Token使用量)</span><span class="lang-en">Top Active Schools (by Total Tokens)</span><span class="lang-az">Ən Aktiv Məktəblər (Ümumi Tokenlərə Görə)</span></h2>
+                </div>
+                <div id="org-distribution"></div>
+            </div>
+        </div>
+
+        <!-- Tokens Tracking Tab -->
+        <div id="tokens-tab" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card" data-metric="token-today" onclick="showTrendChart('token-today', this)">
+                    <h3><span class="lang-zh">今日Token</span><span class="lang-en">Today</span><span class="lang-az">Bu Gün</span></h3>
+                    <div class="value" id="token-today">-</div>
+                </div>
+                <div class="stat-card" data-metric="token-week" onclick="showTrendChart('token-week', this)">
+                    <h3><span class="lang-zh">过去一周</span><span class="lang-en">Past Week</span><span class="lang-az">Keçən Həftə</span></h3>
+                    <div class="value" id="token-week">-</div>
+                </div>
+                <div class="stat-card" data-metric="token-month" onclick="showTrendChart('token-month', this)">
+                    <h3><span class="lang-zh">过去一月</span><span class="lang-en">Past Month</span><span class="lang-az">Keçən Ay</span></h3>
+                    <div class="value" id="token-month">-</div>
+                </div>
+                <div class="stat-card" data-metric="token-total" onclick="showTrendChart('token-total', this)">
+                    <h3><span class="lang-zh">总计</span><span class="lang-en">Total</span><span class="lang-az">Ümumi</span></h3>
+                    <div class="value" id="token-total">-</div>
+                </div>
+            </div>
+
+            <div class="token-leaderboards-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">🏆 <span class="lang-zh">总Token使用量</span><span class="lang-en">Total Token Usage</span><span class="lang-az">Ümumi Token İstifadəsi</span></h2>
+                    </div>
+                    <div id="token-users-list"></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">🏆 <span class="lang-zh">今日Token排行榜</span><span class="lang-en">Today's Token Leaderboard</span><span class="lang-az">Bu Günün Token Reytinqi</span></h2>
+                    </div>
+                    <div id="token-users-today-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schools Tab -->
+        <div id="schools-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><span class="lang-zh">学校列表</span><span class="lang-en">School List</span><span class="lang-az">Məktəb Siyahısı</span></h2>
+                    <div style="display:flex;gap:1rem;align-items:center;">
+                        <select id="school-filter" name="school-filter" class="form-select" style="min-width:250px;" onchange="filterSchools()">
+                            <option value=""></option>
+                        </select>
+                        <button class="btn btn-primary" onclick="showCreateSchoolModal()" style="white-space:nowrap;">
+                            ➕ <span class="lang-zh">创建学校</span><span class="lang-en">Create School</span><span class="lang-az">Məktəb Yarat</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="schools-loading" class="spinner"></div>
+                <table id="schools-table" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th><span class="lang-zh">学校名称</span><span class="lang-en">Name</span><span class="lang-az">Ad</span></th>
+                            <th><span class="lang-zh">邀请码</span><span class="lang-en">Invitation Code</span><span class="lang-az">Dəvət Kodu</span></th>
+                            <th><span class="lang-zh">Token使用量</span><span class="lang-en">Tokens Used</span><span class="lang-az">İstifadə Olunan Tokenlar</span></th>
+                            <th><span class="lang-zh">状态</span><span class="lang-en">Status</span><span class="lang-az">Status</span></th>
+                            <th><span class="lang-zh">用户数</span><span class="lang-en">Users</span><span class="lang-az">İstifadəçilər</span></th>
+                            <th><span class="lang-zh">操作</span><span class="lang-en">Actions</span><span class="lang-az">Əməliyyatlar</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="schools-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="users-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><span class="lang-zh">用户列表</span><span class="lang-en">User List</span><span class="lang-az">İstifadəçi Siyahısı</span></h2>
+                </div>
+                
+                <!-- Filter Controls -->
+                <div style="padding:1rem;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:end;">
+                        <div style="flex:1;min-width:200px;">
+                            <label class="form-label" style="margin-bottom:0.25rem;" for="user-search"><span class="lang-zh">搜索</span><span class="lang-en">Search</span><span class="lang-az">Axtar</span></label>
+                            <input type="text" id="user-search" name="user-search" class="form-input" 
+                                   placeholder="Name or Phone" 
+                                   autocomplete="off"
+                                   onkeyup="if(event.key==='Enter') filterUsers()">
+                        </div>
+                        <div style="min-width:200px;">
+                            <label class="form-label" style="margin-bottom:0.25rem;" for="user-org-filter"><span class="lang-zh">学校筛选</span><span class="lang-en">Filter by School</span><span class="lang-az">Məktəbə Görə Filtr</span></label>
+                            <select id="user-org-filter" name="user-org-filter" class="form-select" onchange="filterUsers()">
+                                <option value=""><span class="lang-zh">全部学校</span><span class="lang-en">All Schools</span><span class="lang-az">Bütün Məktəblər</span></option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="filterUsers()">
+                            🔍 <span class="lang-zh">搜索</span><span class="lang-en">Search</span><span class="lang-az">Axtar</span>
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearUserFilters()">
+                            ↻ <span class="lang-zh">重置</span><span class="lang-en">Reset</span><span class="lang-az">Sıfırla</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="users-loading" class="spinner"></div>
+                <table id="users-table" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th><span class="lang-zh">手机号</span><span class="lang-en">Phone</span><span class="lang-az">Telefon</span></th>
+                            <th><span class="lang-zh">姓名</span><span class="lang-en">Name</span><span class="lang-az">Ad</span></th>
+                            <th><span class="lang-zh">学校</span><span class="lang-en">Organization</span><span class="lang-az">Təşkilat</span></th>
+                            <th><span class="lang-zh">Token使用量</span><span class="lang-en">Tokens Used</span><span class="lang-az">İstifadə Olunan Tokenlar</span></th>
+                            <th><span class="lang-zh">注册时间</span><span class="lang-en">Registration Time</span><span class="lang-az">Qeydiyyat Vaxtı</span></th>
+                            <th><span class="lang-zh">操作</span><span class="lang-en">Actions</span><span class="lang-az">Əməliyyatlar</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody"></tbody>
+                </table>
+                
+                <!-- Pagination Controls -->
+                <div id="users-pagination" style="display:none;padding:1rem;border-top:1px solid #e2e8f0;background:#f8fafc;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                        <div id="users-page-info" style="color:#64748b;">
+                            <!-- Page info will be inserted here -->
+                        </div>
+                        <div style="display:flex;gap:0.5rem;">
+                            <button id="users-prev-btn" class="btn btn-secondary btn-sm" onclick="previousUsersPage()">
+                                ← <span class="lang-zh">上一页</span><span class="lang-en">Previous</span><span class="lang-az">Əvvəlki</span>
+                            </button>
+                            <div id="users-page-numbers" style="display:flex;gap:0.25rem;">
+                                <!-- Page numbers will be inserted here -->
+                            </div>
+                            <button id="users-next-btn" class="btn btn-secondary btn-sm" onclick="nextUsersPage()">
+                                <span class="lang-zh">下一页</span><span class="lang-en">Next</span><span class="lang-az">Növbəti</span> →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Keys Tab -->
+        <div id="apikeys-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">🔑 <span class="lang-zh">API密钥管理</span><span class="lang-en">API Keys Management</span><span class="lang-az">API Açarları İdarəetməsi</span></h2>
+                    <button class="btn btn-primary" onclick="showCreateAPIKeyModal()">
+                        ➕ <span class="lang-zh">创建密钥</span><span class="lang-en">Create API Key</span><span class="lang-az">API Açarı Yarat</span>
+                    </button>
+                </div>
+                <div id="apikeys-loading" class="spinner"></div>
+                <table id="apikeys-table" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th><span class="lang-zh">名称</span><span class="lang-en">Name</span><span class="lang-az">Ad</span></th>
+                            <th><span class="lang-zh">API密钥</span><span class="lang-en">API Key</span><span class="lang-az">API Açarı</span></th>
+                            <th><span class="lang-zh">使用量</span><span class="lang-en">Usage</span><span class="lang-az">İstifadə</span></th>
+                            <th><span class="lang-zh">状态</span><span class="lang-en">Status</span><span class="lang-az">Status</span></th>
+                            <th><span class="lang-zh">创建时间</span><span class="lang-en">Created</span><span class="lang-az">Yaradılıb</span></th>
+                            <th><span class="lang-zh">最后使用</span><span class="lang-en">Last Used</span><span class="lang-az">Son İstifadə</span></th>
+                            <th><span class="lang-zh">操作</span><span class="lang-en">Actions</span><span class="lang-az">Əməliyyatlar</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="apikeys-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Update Announcement Tab -->
+        <div id="announcement-tab" class="tab-content">
+            <div id="announcement-loading" class="spinner"></div>
+            
+            <div id="announcement-form" style="display:none;">
+                <!-- Enable/Disable Toggle -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="font-size:1.1rem;"><span class="lang-zh">公告开关</span><span class="lang-en">Announcement Toggle</span><span class="lang-az">Elan Açıb-Bağlama</span></h3>
+                    </div>
+                    <div style="padding:1rem;">
+                        <div class="form-group" style="display:flex;align-items:center;gap:1rem;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="announcement-enabled" name="announcement-enabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-weight:500;"><span class="lang-zh">启用更新公告</span><span class="lang-en">Enable Update Announcement</span><span class="lang-az">Yeniləmə Elanını Aktivləşdir</span></span>
+                        </div>
+                        <div style="margin-top:0.5rem;color:#64748b;font-size:0.875rem;">
+                            <span class="lang-zh">开启后，用户登录时将看到公告弹窗（每个版本只显示一次）</span><span class="lang-en">When enabled, users will see announcement popup on login (once per version)</span><span class="lang-az">Aktivləşdirildikdə, istifadəçilər giriş zamanı elan pəncərəsi görəcəklər (hər versiya üçün bir dəfə)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Version -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="font-size:1.1rem;"><span class="lang-zh">版本号</span><span class="lang-en">Version Number</span><span class="lang-az">Versiya Nömrəsi</span></h3>
+                    </div>
+                    <div style="padding:1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="announcement-version"><span class="lang-zh">版本号</span><span class="lang-en">Version Number</span><span class="lang-az">Versiya Nömrəsi</span></label>
+                            <input type="text" id="announcement-version" name="announcement-version" class="form-input" placeholder="例如: 1.5.0 / Example: 1.5.0 / Məsələn: 1.5.0" autocomplete="off">
+                            <small style="color:#64748b;"><span class="lang-zh">每个版本号只会显示一次公告。更改版本号后，所有用户将再次看到公告。</span><span class="lang-en">Each version number will only show announcement once. After changing version number, all users will see the announcement again.</span><span class="lang-az">Hər versiya nömrəsi yalnız bir dəfə elan göstərəcək. Versiya nömrəsini dəyişdikdən sonra, bütün istifadəçilər yenidən elanı görəcəklər.</span></small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="font-size:1.1rem;"><span class="lang-zh">公告内容</span><span class="lang-en">Announcement Content</span><span class="lang-az">Elan Məzmunu</span></h3>
+                    </div>
+                    <div style="padding:1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="announcement-title"><span class="lang-zh">标题</span><span class="lang-en">Title</span><span class="lang-az">Başlıq</span></label>
+                            <input type="text" id="announcement-title" name="announcement-title" class="form-input" placeholder="例如: 系统更新 / Example: System Update / Məsələn: Sistem Yeniləməsi" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><span class="lang-zh">公告正文</span><span class="lang-en">Announcement Body</span><span class="lang-az">Elan Mətni</span></label>
+                            <!-- Rich Text Toolbar -->
+                            <div class="rich-text-toolbar">
+                                <select id="font-family-zh" class="toolbar-select" onchange="announcementEditor.execCommand('fontName', this.value)" title="字体">
+                                    <option value="">字体</option>
+                                    <option value="Microsoft YaHei">微软雅黑</option>
+                                    <option value="SimSun">宋体</option>
+                                    <option value="SimHei">黑体</option>
+                                    <option value="KaiTi">楷体</option>
+                                    <option value="FangSong">仿宋</option>
+                                    <option value="Arial">Arial</option>
+                                </select>
+                                <select id="font-size-zh" class="toolbar-select" onchange="announcementEditor.execCommand('fontSize', this.value)" title="字号">
+                                    <option value="">字号</option>
+                                    <option value="1">12px</option>
+                                    <option value="2">14px</option>
+                                    <option value="3">16px</option>
+                                    <option value="4">18px</option>
+                                    <option value="5">24px</option>
+                                    <option value="6">32px</option>
+                                    <option value="7">48px</option>
+                                </select>
+                                <div class="toolbar-divider"></div>
+                                <button type="button" class="toolbar-btn" onclick="announcementEditor.execCommand('bold')" title="粗体"><b>B</b></button>
+                                <button type="button" class="toolbar-btn" onclick="announcementEditor.execCommand('italic')" title="斜体"><i>I</i></button>
+                                <button type="button" class="toolbar-btn" onclick="announcementEditor.execCommand('underline')" title="下划线"><u>U</u></button>
+                                <div class="toolbar-divider"></div>
+                                <button type="button" class="toolbar-btn" onclick="announcementEditor.execCommand('insertUnorderedList')" title="无序列表">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                                        <circle cx="4" cy="6" r="1" fill="currentColor"></circle>
+                                        <circle cx="4" cy="12" r="1" fill="currentColor"></circle>
+                                        <circle cx="4" cy="18" r="1" fill="currentColor"></circle>
+                                    </svg>
+                                </button>
+                                <button type="button" class="toolbar-btn" onclick="announcementEditor.execCommand('insertOrderedList')" title="有序列表">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="10" y1="6" x2="21" y2="6"></line>
+                                        <line x1="10" y1="12" x2="21" y2="12"></line>
+                                        <line x1="10" y1="18" x2="21" y2="18"></line>
+                                        <text x="4" y="8" fill="currentColor" font-size="8">1</text>
+                                        <text x="4" y="14" fill="currentColor" font-size="8">2</text>
+                                        <text x="4" y="20" fill="currentColor" font-size="8">3</text>
+                                    </svg>
+                                </button>
+                                <div class="toolbar-divider"></div>
+                                <input type="color" id="text-color-zh" class="toolbar-color" onchange="announcementEditor.execCommand('foreColor', this.value)" title="文字颜色" value="#000000">
+                                <div class="toolbar-divider"></div>
+                                <button type="button" class="toolbar-btn" onclick="announcementEditor.insertImage()" title="插入图片">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                        <polyline points="21 15 16 10 5 21"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="emoji-picker-wrapper">
+                                    <button type="button" class="toolbar-btn" onclick="announcementEditor.toggleEmojiPicker()" title="插入表情">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                                            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                                            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                                        </svg>
+                                    </button>
+                                    <div id="emoji-picker" class="emoji-picker" style="display:none;">
+                                        <div class="emoji-tabs">
+                                            <button type="button" class="emoji-tab active" onclick="announcementEditor.switchEmojiTab('common')">常用</button>
+                                            <button type="button" class="emoji-tab" onclick="announcementEditor.switchEmojiTab('faces')">表情</button>
+                                            <button type="button" class="emoji-tab" onclick="announcementEditor.switchEmojiTab('gestures')">手势</button>
+                                            <button type="button" class="emoji-tab" onclick="announcementEditor.switchEmojiTab('objects')">物品</button>
+                                            <button type="button" class="emoji-tab" onclick="announcementEditor.switchEmojiTab('symbols')">符号</button>
+                                        </div>
+                                        <div class="emoji-grid" id="emoji-grid-common">
+                                            <span onclick="announcementEditor.insertEmoji('🎉')">🎉</span>
+                                            <span onclick="announcementEditor.insertEmoji('✨')">✨</span>
+                                            <span onclick="announcementEditor.insertEmoji('🚀')">🚀</span>
+                                            <span onclick="announcementEditor.insertEmoji('💡')">💡</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔥')">🔥</span>
+                                            <span onclick="announcementEditor.insertEmoji('⭐')">⭐</span>
+                                            <span onclick="announcementEditor.insertEmoji('❤️')">❤️</span>
+                                            <span onclick="announcementEditor.insertEmoji('👍')">👍</span>
+                                            <span onclick="announcementEditor.insertEmoji('📢')">📢</span>
+                                            <span onclick="announcementEditor.insertEmoji('📌')">📌</span>
+                                            <span onclick="announcementEditor.insertEmoji('✅')">✅</span>
+                                            <span onclick="announcementEditor.insertEmoji('⚡')">⚡</span>
+                                            <span onclick="announcementEditor.insertEmoji('🎯')">🎯</span>
+                                            <span onclick="announcementEditor.insertEmoji('💪')">💪</span>
+                                            <span onclick="announcementEditor.insertEmoji('🌟')">🌟</span>
+                                            <span onclick="announcementEditor.insertEmoji('🎁')">🎁</span>
+                                            <span onclick="announcementEditor.insertEmoji('🆕')">🆕</span>
+                                            <span onclick="announcementEditor.insertEmoji('🆙')">🆙</span>
+                                            <span onclick="announcementEditor.insertEmoji('💯')">💯</span>
+                                            <span onclick="announcementEditor.insertEmoji('🏆')">🏆</span>
+                                        </div>
+                                        <div class="emoji-grid" id="emoji-grid-faces" style="display:none;">
+                                            <span onclick="announcementEditor.insertEmoji('😀')">😀</span>
+                                            <span onclick="announcementEditor.insertEmoji('😃')">😃</span>
+                                            <span onclick="announcementEditor.insertEmoji('😄')">😄</span>
+                                            <span onclick="announcementEditor.insertEmoji('😁')">😁</span>
+                                            <span onclick="announcementEditor.insertEmoji('😊')">😊</span>
+                                            <span onclick="announcementEditor.insertEmoji('🥰')">🥰</span>
+                                            <span onclick="announcementEditor.insertEmoji('😍')">😍</span>
+                                            <span onclick="announcementEditor.insertEmoji('🤩')">🤩</span>
+                                            <span onclick="announcementEditor.insertEmoji('😎')">😎</span>
+                                            <span onclick="announcementEditor.insertEmoji('🤔')">🤔</span>
+                                            <span onclick="announcementEditor.insertEmoji('🧐')">🧐</span>
+                                            <span onclick="announcementEditor.insertEmoji('😇')">😇</span>
+                                            <span onclick="announcementEditor.insertEmoji('🤗')">🤗</span>
+                                            <span onclick="announcementEditor.insertEmoji('😮')">😮</span>
+                                            <span onclick="announcementEditor.insertEmoji('😲')">😲</span>
+                                            <span onclick="announcementEditor.insertEmoji('🥳')">🥳</span>
+                                            <span onclick="announcementEditor.insertEmoji('😴')">😴</span>
+                                            <span onclick="announcementEditor.insertEmoji('🤯')">🤯</span>
+                                            <span onclick="announcementEditor.insertEmoji('😏')">😏</span>
+                                            <span onclick="announcementEditor.insertEmoji('🙄')">🙄</span>
+                                        </div>
+                                        <div class="emoji-grid" id="emoji-grid-gestures" style="display:none;">
+                                            <span onclick="announcementEditor.insertEmoji('👍')">👍</span>
+                                            <span onclick="announcementEditor.insertEmoji('👎')">👎</span>
+                                            <span onclick="announcementEditor.insertEmoji('👏')">👏</span>
+                                            <span onclick="announcementEditor.insertEmoji('🙌')">🙌</span>
+                                            <span onclick="announcementEditor.insertEmoji('🤝')">🤝</span>
+                                            <span onclick="announcementEditor.insertEmoji('✋')">✋</span>
+                                            <span onclick="announcementEditor.insertEmoji('👋')">👋</span>
+                                            <span onclick="announcementEditor.insertEmoji('🤞')">🤞</span>
+                                            <span onclick="announcementEditor.insertEmoji('✌️')">✌️</span>
+                                            <span onclick="announcementEditor.insertEmoji('🤟')">🤟</span>
+                                            <span onclick="announcementEditor.insertEmoji('👌')">👌</span>
+                                            <span onclick="announcementEditor.insertEmoji('👆')">👆</span>
+                                            <span onclick="announcementEditor.insertEmoji('👇')">👇</span>
+                                            <span onclick="announcementEditor.insertEmoji('👈')">👈</span>
+                                            <span onclick="announcementEditor.insertEmoji('👉')">👉</span>
+                                            <span onclick="announcementEditor.insertEmoji('💪')">💪</span>
+                                            <span onclick="announcementEditor.insertEmoji('🙏')">🙏</span>
+                                            <span onclick="announcementEditor.insertEmoji('🤙')">🤙</span>
+                                            <span onclick="announcementEditor.insertEmoji('✍️')">✍️</span>
+                                            <span onclick="announcementEditor.insertEmoji('🖐️')">🖐️</span>
+                                        </div>
+                                        <div class="emoji-grid" id="emoji-grid-objects" style="display:none;">
+                                            <span onclick="announcementEditor.insertEmoji('📱')">📱</span>
+                                            <span onclick="announcementEditor.insertEmoji('💻')">💻</span>
+                                            <span onclick="announcementEditor.insertEmoji('🖥️')">🖥️</span>
+                                            <span onclick="announcementEditor.insertEmoji('📊')">📊</span>
+                                            <span onclick="announcementEditor.insertEmoji('📈')">📈</span>
+                                            <span onclick="announcementEditor.insertEmoji('📝')">📝</span>
+                                            <span onclick="announcementEditor.insertEmoji('📚')">📚</span>
+                                            <span onclick="announcementEditor.insertEmoji('📖')">📖</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔧')">🔧</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔨')">🔨</span>
+                                            <span onclick="announcementEditor.insertEmoji('⚙️')">⚙️</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔑')">🔑</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔒')">🔒</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔓')">🔓</span>
+                                            <span onclick="announcementEditor.insertEmoji('💾')">💾</span>
+                                            <span onclick="announcementEditor.insertEmoji('📁')">📁</span>
+                                            <span onclick="announcementEditor.insertEmoji('🗂️')">🗂️</span>
+                                            <span onclick="announcementEditor.insertEmoji('📋')">📋</span>
+                                            <span onclick="announcementEditor.insertEmoji('🎵')">🎵</span>
+                                            <span onclick="announcementEditor.insertEmoji('🎬')">🎬</span>
+                                        </div>
+                                        <div class="emoji-grid" id="emoji-grid-symbols" style="display:none;">
+                                            <span onclick="announcementEditor.insertEmoji('✅')">✅</span>
+                                            <span onclick="announcementEditor.insertEmoji('❌')">❌</span>
+                                            <span onclick="announcementEditor.insertEmoji('⭕')">⭕</span>
+                                            <span onclick="announcementEditor.insertEmoji('❗')">❗</span>
+                                            <span onclick="announcementEditor.insertEmoji('❓')">❓</span>
+                                            <span onclick="announcementEditor.insertEmoji('⚠️')">⚠️</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔴')">🔴</span>
+                                            <span onclick="announcementEditor.insertEmoji('🟠')">🟠</span>
+                                            <span onclick="announcementEditor.insertEmoji('🟡')">🟡</span>
+                                            <span onclick="announcementEditor.insertEmoji('🟢')">🟢</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔵')">🔵</span>
+                                            <span onclick="announcementEditor.insertEmoji('🟣')">🟣</span>
+                                            <span onclick="announcementEditor.insertEmoji('⬆️')">⬆️</span>
+                                            <span onclick="announcementEditor.insertEmoji('⬇️')">⬇️</span>
+                                            <span onclick="announcementEditor.insertEmoji('➡️')">➡️</span>
+                                            <span onclick="announcementEditor.insertEmoji('⬅️')">⬅️</span>
+                                            <span onclick="announcementEditor.insertEmoji('↩️')">↩️</span>
+                                            <span onclick="announcementEditor.insertEmoji('🔄')">🔄</span>
+                                            <span onclick="announcementEditor.insertEmoji('➕')">➕</span>
+                                            <span onclick="announcementEditor.insertEmoji('➖')">➖</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Hidden file input for image upload -->
+                                <input type="file" id="announcement-image-input" accept="image/*" style="display:none;" onchange="announcementEditor.handleImageUpload(this)">
+                            </div>
+                            <!-- Editable Content Area -->
+                            <div id="announcement-message" class="rich-text-editor" contenteditable="true" data-placeholder="请输入公告内容... / Please enter announcement content... / Zəhmət olmasa elan məzmununu daxil edin..."></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Actions -->
+                <div style="display:flex;gap:1rem;margin-top:1rem;">
+                    <button class="btn btn-secondary" onclick="previewAnnouncement()">👁 <span class="lang-zh">预览</span><span class="lang-en">Preview</span><span class="lang-az">Önizləmə</span></button>
+                    <button class="btn btn-primary" onclick="saveAnnouncementConfig()">💾 <span class="lang-zh">保存设置</span><span class="lang-en">Save Settings</span><span class="lang-az">Parametrləri Saxla</span></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Realtime Monitoring Tab -->
+        <div id="realtime-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                    <h2 class="card-title"><span class="lang-zh">实时用户活动监控</span><span class="lang-en">Real-time User Activity Monitor</span><span class="lang-az">Real Vaxt İstifadəçi Fəaliyyəti Monitoru</span></h2>
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <span id="realtime-status" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;background:rgba(100,116,139,0.2);border-radius:8px;font-size:0.875rem;">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#64748b;"></span>
+                            <span class="lang-zh">未连接</span><span class="lang-en">Disconnected</span><span class="lang-az">Bağlı Deyil</span>
+                        </span>
+                        <button class="btn btn-primary" onclick="toggleRealtimeStream()" id="realtime-toggle-btn">
+                            <span class="lang-zh">开始监控</span><span class="lang-en">Start Monitoring</span><span class="lang-az">Monitoru Başlat</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid" style="margin-top:1rem;">
+                <div class="stat-card">
+                    <h3><span class="lang-zh">在线用户</span><span class="lang-en">Active Users</span><span class="lang-az">Aktiv İstifadəçilər</span></h3>
+                    <div class="value" id="realtime-active-users">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3><span class="lang-zh">总会话数</span><span class="lang-en">Total Sessions</span><span class="lang-az">Ümumi Sessiyalar</span></h3>
+                    <div class="value" id="realtime-total-sessions">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3><span class="lang-zh">唯一用户</span><span class="lang-en">Unique Users</span><span class="lang-az">Unikal İstifadəçilər</span></h3>
+                    <div class="value" id="realtime-unique-users">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3><span class="lang-zh">最近活动</span><span class="lang-en">Recent Activities</span><span class="lang-az">Son Fəaliyyətlər</span></h3>
+                    <div class="value" id="realtime-recent-activities">0</div>
+                </div>
+            </div>
+
+            <!-- Active Users List -->
+            <div class="card" style="margin-top:1rem;">
+                <div class="card-header">
+                    <h2 class="card-title"><span class="lang-zh">当前在线用户</span><span class="lang-en">Currently Active Users</span><span class="lang-az">Hal-hazırda Aktiv İstifadəçilər</span></h2>
+                </div>
+                <div id="realtime-users-loading" class="spinner"></div>
+                <div id="realtime-users-container" style="display:none;">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                                <th style="text-align:left;padding:0.75rem;color:#94a3b8;font-weight:600;"><span class="lang-zh">用户</span><span class="lang-en">User</span><span class="lang-az">İstifadəçi</span></th>
+                                <th style="text-align:left;padding:0.75rem;color:#94a3b8;font-weight:600;"><span class="lang-zh">当前活动</span><span class="lang-en">Current Activity</span><span class="lang-az">Cari Fəaliyyət</span></th>
+                                <th style="text-align:left;padding:0.75rem;color:#94a3b8;font-weight:600;"><span class="lang-zh">活动次数</span><span class="lang-en">Activity Count</span><span class="lang-az">Fəaliyyət Sayı</span></th>
+                                <th style="text-align:left;padding:0.75rem;color:#94a3b8;font-weight:600;"><span class="lang-zh">会话时长</span><span class="lang-en">Session Duration</span><span class="lang-az">Sessiya Müddəti</span></th>
+                                <th style="text-align:left;padding:0.75rem;color:#94a3b8;font-weight:600;"><span class="lang-zh">最后活动</span><span class="lang-en">Last Activity</span><span class="lang-az">Son Fəaliyyət</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="realtime-users-tbody">
+                            <tr>
+                                <td colspan="5" style="text-align:center;padding:2rem;color:#64748b;">
+                                    <span class="lang-zh">暂无在线用户</span><span class="lang-en">No active users</span><span class="lang-az">Aktiv istifadəçi yoxdur</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup List Modal -->
+    <div id="backup-list-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">📦 .env Backup Files</h3>
+                <span class="close" onclick="closeModal('backup-list-modal')">&times;</span>
+            </div>
+            <div id="backup-list-loading" class="spinner"></div>
+            <div id="backup-list-content" style="display:none;">
+                <table style="width:100%;">
+                    <thead>
+                        <tr>
+                            <th>Backup File</th>
+                            <th>Created</th>
+                            <th>Size</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backup-list-tbody"></tbody>
+                </table>
+                <p id="no-backups-message" style="display:none;color:#64748b;text-align:center;padding:2rem;">
+                    No backup files found. Backups are created automatically when you save settings.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create School Modal -->
+    <div id="create-school-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><span class="lang-zh">创建学校</span><span class="lang-en">Create School</span><span class="lang-az">Məktəb Yarat</span></h3>
+                <span class="close" onclick="closeModal('create-school-modal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new-school-name"><span class="lang-zh">学校名称</span><span class="lang-en">School Name</span><span class="lang-az">Məktəb Adı</span> *</label>
+                <input type="text" id="new-school-name" name="new-school-name" class="form-input" 
+                       placeholder="Beijing High School 北京高中 / Bakı Liseyi" 
+                       autocomplete="organization"
+                       oninput="autoGenerateSchoolCode()" required>
+                <small style="color:#64748b;"><span class="lang-zh">先输入学校名称，代码将自动生成</span><span class="lang-en">Enter the school name first, code will be generated automatically</span><span class="lang-az">Əvvəlcə məktəb adını daxil edin, kod avtomatik yaradılacaq</span></small>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new-school-code"><span class="lang-zh">学校代码</span><span class="lang-en">School Code</span><span class="lang-az">Məktəb Kodu</span> *</label>
+                <div style="display:flex;gap:0.5rem;">
+                    <input type="text" id="new-school-code" name="new-school-code" class="form-input" 
+                           placeholder="AUTO-GENERATED / 自动生成 / AVTOMATIK YARADILIR" required
+                           autocomplete="off"
+                           style="flex:1;background:#f8fafc;">
+                    <button type="button" class="btn btn-secondary" onclick="regenerateSchoolCode()" title="Regenerate Code / 重新生成 / Yenidən Yarat">
+                        🔄
+                    </button>
+                </div>
+                <small style="color:#64748b;"><span class="lang-zh">从学校名称自动生成（可编辑，点击 🔄 重新生成）</span><span class="lang-en">Auto-generated from school name (editable, click 🔄 to regenerate)</span><span class="lang-az">Məktəb adından avtomatik yaradılır (redaktə oluna bilər, 🔄 düyməsinə klikləyin)</span></small>
+            </div>
+            <div style="padding:1rem;background:#f8fafc;border-radius:8px;margin-bottom:1rem;">
+                <small style="color:#64748b;">
+                    ℹ️ <strong>Note:</strong> Invitation code will be automatically generated after creation
+                </small>
+            </div>
+            <button class="btn btn-primary" onclick="createSchool()"><span class="lang-zh">创建</span><span class="lang-en">Create</span></button>
+        </div>
+    </div>
+
+    <!-- Edit School Modal -->
+    <div id="edit-school-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><span class="lang-zh">编辑学校</span><span class="lang-en">Edit School</span><span class="lang-az">Məktəbi Redaktə Et</span></h3>
+                <span class="close" onclick="closeModal('edit-school-modal')">&times;</span>
+            </div>
+            <input type="hidden" id="edit-school-id" name="edit-school-id">
+            <div class="form-group">
+                <label class="form-label" for="edit-school-code"><span class="lang-zh">学校代码</span><span class="lang-en">School Code</span><span class="lang-az">Məktəb Kodu</span></label>
+                <input type="text" id="edit-school-code" name="edit-school-code" class="form-input" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-school-name"><span class="lang-zh">学校名称</span><span class="lang-en">School Name</span><span class="lang-az">Məktəb Adı</span></label>
+                <input type="text" id="edit-school-name" name="edit-school-name" class="form-input" autocomplete="organization">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-school-invite"><span class="lang-zh">邀请码</span><span class="lang-en">Invitation Code</span><span class="lang-az">Dəvət Kodu</span></label>
+                <input type="text" id="edit-school-invite" name="edit-school-invite" class="form-input" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-school-expires"><span class="lang-zh">服务到期日期</span><span class="lang-en">Service Expiration Date</span><span class="lang-az">Xidmət Bitmə Tarixi</span></label>
+                <input type="date" id="edit-school-expires" name="edit-school-expires" class="form-input" autocomplete="off">
+                <small style="color:#64748b;"><span class="lang-zh">留空表示永久有效</span><span class="lang-en">Leave empty for no expiration</span><span class="lang-az">Boş buraxılsa, müddətsizdir</span></small>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-school-active"><span class="lang-zh">账户状态</span><span class="lang-en">Account Status</span><span class="lang-az">Hesab Statusu</span></label>
+                <select id="edit-school-active" name="edit-school-active" class="form-select">
+                    <option value="true"><span class="lang-zh">激活</span><span class="lang-en">Active</span><span class="lang-az">Aktiv</span></option>
+                    <option value="false"><span class="lang-zh">锁定</span><span class="lang-en">Locked</span><span class="lang-az">Kilidlənib</span></option>
+                </select>
+                <small style="color:#64748b;"><span class="lang-zh">锁定后该组织的所有用户将无法登录</span><span class="lang-en">Locked organizations cannot login</span><span class="lang-az">Kilidlənmiş təşkilatlar giriş edə bilməz</span></small>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn btn-secondary" onclick="regenerateInviteCode()"><span class="lang-zh">重新生成</span><span class="lang-en">Regenerate</span><span class="lang-az">Yenidən Yarat</span></button>
+                <button class="btn btn-primary" onclick="updateSchool()"><span class="lang-zh">保存</span><span class="lang-en">Save</span><span class="lang-az">Saxla</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="edit-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><span class="lang-zh">编辑用户</span><span class="lang-en">Edit User</span><span class="lang-az">İstifadəçini Redaktə Et</span></h3>
+                <span class="close" onclick="closeModal('edit-user-modal')">&times;</span>
+            </div>
+            <input type="hidden" id="edit-user-id" name="edit-user-id">
+            <div class="form-group">
+                <label class="form-label" for="edit-user-phone"><span class="lang-zh">手机号</span><span class="lang-en">Phone Number</span><span class="lang-az">Telefon Nömrəsi</span> *</label>
+                <input type="tel" id="edit-user-phone" name="edit-user-phone" class="form-input" 
+                       placeholder="13812345678" maxlength="11" autocomplete="tel" required>
+                <small style="color:#64748b;">11-digit Chinese mobile number</small>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-user-name"><span class="lang-zh">姓名</span><span class="lang-en">Name</span><span class="lang-az">Ad</span> *</label>
+                <input type="text" id="edit-user-name" name="edit-user-name" class="form-input" 
+                       placeholder="Zhang Wei" autocomplete="name" required>
+                <small style="color:#64748b;">At least 2 characters, no numbers</small>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-user-org"><span class="lang-zh">学校</span><span class="lang-en">School</span><span class="lang-az">Məktəb</span> *</label>
+                <select id="edit-user-org" name="edit-user-org" class="form-select" required>
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-user-reset-password"><span class="lang-zh">重置密码</span><span class="lang-en">Reset Password</span><span class="lang-az">Parolu Sıfırla</span></label>
+                <input type="text" id="edit-user-reset-password" name="edit-user-reset-password" class="form-input" 
+                       placeholder="12345678" value="12345678" autocomplete="new-password">
+                <small style="color:#64748b;"><span class="lang-zh">留空或输入 '12345678' 将重置为默认密码 '12345678'</span><span class="lang-en">Leave empty or enter '12345678' to use default password '12345678'</span><span class="lang-az">Boş buraxın və ya '12345678' daxil edin, standart parol '12345678' istifadə olunacaq</span></small>
+            </div>
+            <div style="display:flex;gap:0.5rem;align-items:center;justify-content:center;">
+                <button class="btn btn-primary" onclick="updateUser()"><span class="lang-zh">保存</span><span class="lang-en">Save</span><span class="lang-az">Saxla</span></button>
+                <button class="btn btn-warning" onclick="resetPasswordFromModal()"><span class="lang-zh">重置密码</span><span class="lang-en">Reset Password</span><span class="lang-az">Parolu Sıfırla</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create API Key Modal -->
+    <div id="create-apikey-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">🔑 <span class="lang-zh">创建API密钥</span><span class="lang-en">Create API Key</span><span class="lang-az">API Açarı Yarat</span></h3>
+                <span class="close" onclick="closeModal('create-apikey-modal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new-apikey-name"><span class="lang-zh">名称</span><span class="lang-en">Name</span><span class="lang-az">Ad</span> *</label>
+                <input type="text" id="new-apikey-name" name="new-apikey-name" class="form-input" 
+                       placeholder="Dify Integration, Mobile App, etc. / Dify集成, 移动应用等 / Dify İnteqrasiyası, Mobil Tətbiq və s." autocomplete="off" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new-apikey-description"><span class="lang-zh">描述</span><span class="lang-en">Description</span><span class="lang-az">Təsvir</span></label>
+                <textarea id="new-apikey-description" name="new-apikey-description" class="form-textarea" style="min-height:80px;"
+                          placeholder="Purpose of this API key... / 此API密钥的用途... / Bu API açarının məqsədi..." autocomplete="off"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new-apikey-quota"><span class="lang-zh">配额限制（留空表示无限制）</span><span class="lang-en">Quota Limit (leave empty for unlimited)</span><span class="lang-az">Kvota Limiti (boş buraxılsa, limitsizdir)</span></label>
+                <input type="number" id="new-apikey-quota" name="new-apikey-quota" class="form-input" 
+                       placeholder="10000" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new-apikey-expires"><span class="lang-zh">有效期（天数，可选）</span><span class="lang-en">Expires in (days, optional)</span><span class="lang-az">Müddəti (gün, istəyə bağlıdır)</span></label>
+                <input type="number" id="new-apikey-expires" name="new-apikey-expires" class="form-input" 
+                       placeholder="365" autocomplete="off">
+            </div>
+            <button class="btn btn-primary" onclick="createAPIKey()">🔑 <span class="lang-zh">生成API密钥</span><span class="lang-en">Generate API Key</span><span class="lang-az">API Açarı Yarat</span></button>
+        </div>
+    </div>
+
+    <!-- Show API Key Modal -->
+    <div id="show-apikey-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">✅ <span class="lang-zh">API密钥已创建</span><span class="lang-en">API Key Created</span><span class="lang-az">API Açarı Yaradıldı</span></h3>
+                <span class="close" onclick="closeModal('show-apikey-modal')">&times;</span>
+            </div>
+            <div class="alert alert-warning show">
+                ⚠️ <strong><span class="lang-zh">重要：</span><span class="lang-en">Important:</span><span class="lang-az">Vacibdir:</span></strong> <span class="lang-zh">请安全保存此密钥 - 它不会再次显示！</span><span class="lang-en">Save this key securely - it won't be shown again!</span><span class="lang-az">Bu açarı təhlükəsiz saxlayın - yenidən göstərilməyəcək!</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="generated-apikey"><span class="lang-zh">API密钥</span><span class="lang-en">API Key</span><span class="lang-az">API Açarı</span></label>
+                <input type="text" id="generated-apikey" name="generated-apikey" class="form-input" readonly 
+                       autocomplete="off"
+                       style="font-family:monospace;font-size:0.875rem;" onclick="this.select()">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="apikey-usage-instructions"><span class="lang-zh">使用说明</span><span class="lang-en">Usage Instructions</span><span class="lang-az">İstifadə Təlimatları</span></label>
+                <textarea id="apikey-usage-instructions" name="apikey-usage-instructions" readonly class="form-textarea" style="min-height:100px;" autocomplete="off">Add this header to your HTTP requests:
+X-API-Key: [your-key-here]
+
+Example (curl):
+curl -X POST http://your-server/api/generate_graph \
+  -H "X-API-Key: [your-key]" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"test","diagram_type":"mind_map"}'</textarea>
+            </div>
+            <button class="btn btn-primary" onclick="copyAPIKey()">📋 <span class="lang-zh">复制到剪贴板</span><span class="lang-en">Copy to Clipboard</span><span class="lang-az">Mübadilə Buferinə Kopyala</span></button>
+        </div>
+    </div>
+
+    <!-- Edit API Key Modal -->
+    <div id="edit-apikey-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">✏️ <span class="lang-zh">编辑API密钥</span><span class="lang-en">Edit API Key</span><span class="lang-az">API Açarını Redaktə Et</span></h3>
+                <span class="close" onclick="closeModal('edit-apikey-modal')">&times;</span>
+            </div>
+            <input type="hidden" id="edit-apikey-id" name="edit-apikey-id">
+            <div class="form-group">
+                <label class="form-label" for="edit-apikey-name"><span class="lang-zh">名称</span><span class="lang-en">Name</span><span class="lang-az">Ad</span></label>
+                <input type="text" id="edit-apikey-name" name="edit-apikey-name" class="form-input" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-apikey-description"><span class="lang-zh">描述</span><span class="lang-en">Description</span><span class="lang-az">Təsvir</span></label>
+                <textarea id="edit-apikey-description" name="edit-apikey-description" class="form-textarea" style="min-height:80px;" autocomplete="off"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-apikey-quota"><span class="lang-zh">配额限制（留空表示无限制）</span><span class="lang-en">Quota Limit (empty for unlimited)</span><span class="lang-az">Kvota Limiti (boş buraxılsa, limitsizdir)</span></label>
+                <input type="number" id="edit-apikey-quota" name="edit-apikey-quota" class="form-input" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-apikey-usage"><span class="lang-zh">使用次数（如需要可重置为0）</span><span class="lang-en">Usage Count (reset to 0 if needed)</span><span class="lang-az">İstifadə Sayı (lazım olsa, 0-a sıfırlayın)</span></label>
+                <input type="number" id="edit-apikey-usage" name="edit-apikey-usage" class="form-input" autocomplete="off">
+            </div>
+            <button class="btn btn-primary" onclick="updateAPIKey()">💾 <span class="lang-zh">保存更改</span><span class="lang-en">Save Changes</span><span class="lang-az">Dəyişiklikləri Saxla</span></button>
+        </div>
+    </div>
+
+    <!-- Share Invitation Info Modal -->
+    <div id="share-invite-modal" class="modal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">📤 <span class="lang-zh">分享邀请信息</span><span class="lang-en">Share Invitation Info</span><span class="lang-az">Dəvət Məlumatını Paylaş</span></h3>
+                <span class="close" onclick="closeModal('share-invite-modal')">&times;</span>
+            </div>
+            <div style="margin-bottom:1rem;color:#64748b;font-size:0.9rem;">
+                <span class="lang-zh">复制以下信息分享给用户：</span>
+                <span class="lang-en">Copy the information below to share with users:</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="share-invite-text" style="display:none;">Share Invitation Text</label>
+                <textarea id="share-invite-text" name="share-invite-text" class="form-textarea" readonly
+                          style="min-height:100px;font-size:1rem;line-height:1.6;background:#f8fafc;border:2px solid #667eea;font-family:inherit;"
+                          autocomplete="off"
+                          onclick="this.select()"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="selectAndCopyShareText(this)" style="width:100%;">
+                📋 <span class="lang-zh">选中并复制</span><span class="lang-en">Select and Copy</span>
+            </button>
+            <small style="display:block;margin-top:1rem;color:#94a3b8;text-align:center;">
+                <span class="lang-zh">点击文本框即可选中，或点击上方按钮自动复制</span>
+                <span class="lang-en">Click the text box to select, or click the button above to copy automatically</span>
+            </small>
+        </div>
+    </div>
+
+    <!-- Trend Chart Modal -->
+    <div id="trend-chart-modal" class="modal">
+        <div class="modal-content chart-modal">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:1rem;">
+                    <button id="back-to-org-btn" onclick="goBackToOrgUsers()" style="display:none;background:#667eea;color:white;border:none;padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.9rem;font-weight:500;transition:background 0.2s;" onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#667eea'">
+                        ← <span class="lang-zh">返回</span><span class="lang-en">Back</span><span class="lang-az">Geri</span>
+                    </button>
+                    <h3 class="modal-title" id="trend-chart-title" style="margin:0;">
+                        <span class="lang-zh">趋势图表</span><span class="lang-en">Trend Chart</span><span class="lang-az">Tendensiya Qrafiki</span>
+                    </h3>
+                </div>
+                <span class="close" onclick="closeModal('trend-chart-modal')">&times;</span>
+            </div>
+            <!-- Tabs -->
+            <div class="modal-tabs" style="display:flex;border-bottom:2px solid #e2e8f0;margin-bottom:1rem;">
+                <button class="modal-tab active" id="org-chart-tab" onclick="switchOrgModalTab('chart')">
+                    <span class="lang-zh">趋势</span><span class="lang-en">Trend</span><span class="lang-az">Tendensiya</span>
+                </button>
+                <button class="modal-tab" id="org-users-tab" onclick="switchOrgModalTab('users')">
+                    <span class="lang-zh">用户</span><span class="lang-en">Users</span><span class="lang-az">İstifadəçilər</span>
+                </button>
+            </div>
+            <!-- Chart Tab Content -->
+            <div id="org-chart-content" class="org-modal-tab-content">
+                <div class="chart-container">
+                    <canvas id="trend-chart-canvas"></canvas>
+                </div>
+                <div id="org-token-stats-cards" style="display:none;padding:1rem;border-top:1px solid #e2e8f0;">
+                    <div class="stats-grid org-token-stats-grid" style="gap:1rem;">
+                        <div class="stat-card" id="org-stat-today" onclick="switchOrgChartPeriod('today')" style="cursor:pointer;">
+                            <h3><span class="lang-zh">今日Token</span><span class="lang-en">Today</span><span class="lang-az">Bu Gün</span></h3>
+                            <div class="value" id="org-token-today">-</div>
+                        </div>
+                        <div class="stat-card" id="org-stat-week" onclick="switchOrgChartPeriod('week')" style="cursor:pointer;">
+                            <h3><span class="lang-zh">过去一周</span><span class="lang-en">Past Week</span><span class="lang-az">Keçən Həftə</span></h3>
+                            <div class="value" id="org-token-week">-</div>
+                        </div>
+                        <div class="stat-card" id="org-stat-month" onclick="switchOrgChartPeriod('month')" style="cursor:pointer;">
+                            <h3><span class="lang-zh">过去一月</span><span class="lang-en">Past Month</span><span class="lang-az">Keçən Ay</span></h3>
+                            <div class="value" id="org-token-month">-</div>
+                        </div>
+                        <div class="stat-card" id="org-stat-total" onclick="switchOrgChartPeriod('total')" style="cursor:pointer;">
+                            <h3><span class="lang-zh">总计</span><span class="lang-en">Total</span><span class="lang-az">Ümumi</span></h3>
+                            <div class="value" id="org-token-total">-</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- User Token Stats Cards (shown when viewing user trends) -->
+                <div id="user-token-stats-cards" style="display:none;padding:1rem;border-top:1px solid #e2e8f0;">
+                    <div class="stats-grid org-token-stats-grid" style="gap:1rem;">
+                        <div class="stat-card" id="user-stat-today" onclick="switchUserChartPeriod('today')" style="cursor:pointer;">
+                            <h3><span class="lang-zh">今日Token</span><span class="lang-en">Today</span><span class="lang-az">Bu Gün</span></h3>
+                            <div class="value" id="user-token-today">-</div>
+                        </div>
+                        <div class="stat-card" id="user-stat-week" onclick="switchUserChartPeriod('week')" style="cursor:pointer;">
+                            <h3><span class="lang-zh">过去一周</span><span class="lang-en">Past Week</span><span class="lang-az">Keçən Həftə</span></h3>
+                            <div class="value" id="user-token-week">-</div>
+                        </div>
+                        <div class="stat-card" id="user-stat-month" onclick="switchUserChartPeriod('month')" style="cursor:pointer;">
+                            <h3><span class="lang-zh">过去一月</span><span class="lang-en">Past Month</span><span class="lang-az">Keçən Ay</span></h3>
+                            <div class="value" id="user-token-month">-</div>
+                        </div>
+                        <div class="stat-card" id="user-stat-total" onclick="switchUserChartPeriod('total')" style="cursor:pointer;">
+                            <h3><span class="lang-zh">总计</span><span class="lang-en">Total</span><span class="lang-az">Ümumi</span></h3>
+                            <div class="value" id="user-token-total">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Users Tab Content -->
+            <div id="org-users-content" class="org-modal-tab-content" style="display:none;">
+                <div id="org-users-loading" class="spinner"></div>
+                <div id="org-users-list" style="display:none;max-height:500px;overflow-y:auto;">
+                    <!-- User list will be populated here -->
+                </div>
+                <div id="org-users-empty" style="display:none;text-align:center;padding:3rem;color:#64748b;">
+                    <span class="lang-zh">该学校暂无用户</span><span class="lang-en">No users found for this organization</span><span class="lang-az">Bu təşkilat üçün istifadəçi tapılmadı</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unauthenticated Overlay -->
+    <div id="auth-required-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:white; border-radius:20px; padding:3rem; text-align:center; max-width:500px; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+            <div style="font-size:4rem; margin-bottom:1rem;">🔒</div>
+            <h2 style="font-size:1.75rem; margin-bottom:1rem; color:#1e293b;">Admin Authentication Required</h2>
+            <p style="color:#64748b; margin-bottom:2rem;">Please authenticate to access the admin panel</p>
+            
+            <div style="display:grid; gap:1rem;">
+                <a href="/auth?redirect=/admin" class="btn btn-primary" style="display:block; text-decoration:none; padding:1rem;">
+                    🔐 Standard Login / 标准登录
+                </a>
+                <a href="/demo?redirect=/admin" class="btn btn-secondary" style="display:block; text-decoration:none; padding:1rem;">
+                    🎯 Demo Mode / 演示模式
+                </a>
+            </div>
+            
+            <p style="color:#94a3b8; font-size:0.875rem; margin-top:1.5rem;">
+                Admins can access this panel from any authentication mode
+            </p>
+        </div>
+    </div>
+
+    <!-- Chart.js libraries -->
+    <script src="/static/js/auth-helper.js?v={{ version }}"></script>
+    <script src="/static/js/chart.umd.min.js?v={{ version }}"></script>
+    <script src="/static/js/chartjs-plugin-zoom.min.js?v={{ version }}"></script>
+    <script src="/static/js/chartjs-plugin-datalabels.min.js?v={{ version }}"></script>
+
+    <!-- Register Chart.js plugins -->
+    <script>
+        // Register Chart.js plugins after they're loaded
+        (function() {
+            // Wait for Chart.js and plugins to be available
+            function registerPlugins() {
+                if (typeof Chart !== 'undefined') {
+                    // Register datalabels plugin if available
+                    if (typeof ChartDataLabels !== 'undefined') {
+                        Chart.register(ChartDataLabels);
+                        console.log('Chart.js datalabels plugin registered');
+                    }
+                    return true;
+                }
+                return false;
+            }
+            
+            // Try immediately
+            if (!registerPlugins()) {
+                // If not ready, wait a bit and try again
+                setTimeout(function() {
+                    registerPlugins();
+                }, 100);
+            }
+        })();
+    </script>
+
+    <!-- Set app version before loading modules (needed for cache detection) -->
+    <script>
+        window.MINDGRAPH_VERSION = '{{ version }}';
+    </script>
+
+    <!-- Admin Panel JavaScript Modules -->
+    <script src="/static/js/admin-utils.js?v={{ version }}"></script>
+    <script src="/static/js/admin-auth.js?v={{ version }}"></script>
+    <script src="/static/js/admin-dashboard.js?v={{ version }}"></script>
+    <script src="/static/js/admin-tokens.js?v={{ version }}"></script>
+    <script src="/static/js/admin-schools.js?v={{ version }}"></script>
+    <script src="/static/js/admin-users.js?v={{ version }}"></script>
+    <script src="/static/js/admin-apikeys.js?v={{ version }}"></script>
+    <script src="/static/js/admin-announcement.js?v={{ version }}"></script>
+    <script src="/static/js/admin-realtime.js?v={{ version }}"></script>
+
+    <!-- Initialize admin panel -->
+    <script>
+        // Initialize after DOM and modules loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAdminAuth().then(() => {
+                initLanguage();
+                loadDashboard();
+            });
+        });
+    </script>
+</body>
+</html>

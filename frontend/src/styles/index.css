@@ -1,0 +1,361 @@
+/**
+ * MindGraph Global Styles
+ */
+
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities);
+
+/* Tailwind 4 Theme Configuration (migrated from tailwind.config.js) */
+@theme {
+  /* Primary color palette */
+  --color-primary-50: #ecf5ff;
+  --color-primary-100: #d9ecff;
+  --color-primary-200: #b3d8ff;
+  --color-primary-300: #8cc5ff;
+  --color-primary-400: #66b1ff;
+  --color-primary-500: #409eff;
+  --color-primary-600: #337ecc;
+  --color-primary-700: #265f99;
+  --color-primary-800: #1a3f66;
+  --color-primary-900: #0d2033;
+  --color-primary: #409eff;
+  --color-primary-light: #66b1ff;
+  --color-primary-dark: #337ecc;
+
+  /* Semantic colors */
+  --color-success: #67c23a;
+  --color-warning: #e6a23c;
+  --color-danger: #f56c6c;
+  --color-info: #909399;
+
+  /* Font family */
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+/* Custom CSS Variables */
+:root {
+  --mg-header-height: 56px;
+  --mg-sidebar-width: 240px;
+  --mg-panel-width: 320px;
+  --mg-toolbar-height: 48px;
+
+  /* Colors */
+  --mg-primary: #409eff;
+  --mg-primary-light: #66b1ff;
+  --mg-primary-dark: #337ecc;
+  --mg-success: #67c23a;
+  --mg-warning: #e6a23c;
+  --mg-danger: #f56c6c;
+  --mg-info: #909399;
+
+  /* Background */
+  --mg-bg-primary: #ffffff;
+  --mg-bg-secondary: #f5f7fa;
+  --mg-bg-tertiary: #e4e7ed;
+
+  /* Text */
+  --mg-text-primary: #303133;
+  --mg-text-regular: #606266;
+  --mg-text-secondary: #909399;
+  --mg-text-placeholder: #c0c4cc;
+
+  /* Border */
+  --mg-border-color: #dcdfe6;
+  --mg-border-light: #e4e7ed;
+
+  /* Shadow */
+  --mg-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --mg-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --mg-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark mode variables */
+.dark {
+  --mg-bg-primary: #1a1a2e;
+  --mg-bg-secondary: #16213e;
+  --mg-bg-tertiary: #0f3460;
+
+  --mg-text-primary: #e4e7ed;
+  --mg-text-regular: #c0c4cc;
+  --mg-text-secondary: #909399;
+  --mg-text-placeholder: #606266;
+
+  --mg-border-color: #4a4a5e;
+  --mg-border-light: #3a3a4e;
+
+  --mg-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --mg-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --mg-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Base styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--mg-bg-secondary);
+  color: var(--mg-text-primary);
+  line-height: 1.5;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--mg-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--mg-border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mg-text-secondary);
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--mg-primary);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: var(--mg-primary);
+  color: white;
+}
+
+/* Element Plus overrides for dark mode */
+.dark .el-button--default {
+  background-color: var(--mg-bg-tertiary);
+  border-color: var(--mg-border-color);
+  color: var(--mg-text-primary);
+}
+
+.dark .el-input__wrapper {
+  background-color: var(--mg-bg-tertiary);
+}
+
+.dark .el-card {
+  background-color: var(--mg-bg-primary);
+  border-color: var(--mg-border-color);
+}
+
+.dark .el-dropdown-menu {
+  background-color: var(--mg-bg-primary);
+  border-color: var(--mg-border-color);
+}
+
+.dark .el-dropdown-menu__item {
+  color: var(--mg-text-primary);
+}
+
+.dark .el-dropdown-menu__item:hover {
+  background-color: var(--mg-bg-tertiary);
+}
+
+/* Utility classes */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-select {
+  user-select: none;
+}
+
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grabbing {
+  cursor: grabbing;
+}
+
+/* Hide scrollbar utility */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* MindGraph slot editing styles */
+[data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+[data-slot]:focus,
+#mindgraph-free-input:focus {
+  outline: 2px solid #60a5fa;
+  outline-offset: 1px;
+  color: #000 !important;
+}
+
+#mindgraph-free-input:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+/* Animation for typing indicator */
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 0.6s infinite;
+}
+
+/* Dark theme for Element Plus messages */
+.dark-message.el-message {
+  --el-message-bg-color: #1c1c1e;
+  --el-message-border-color: #2c2c2e;
+  --el-message-text-color: #f5f5f7;
+  background-color: #1c1c1e;
+  border-color: #3a3a3c;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.dark-message.el-message .el-message__content {
+  color: #f5f5f7;
+  font-weight: 500;
+}
+
+.dark-message.el-message--success {
+  --el-message-bg-color: #1c2e1c;
+  background-color: #1a2e1a;
+  border-color: #2d5a2d;
+}
+
+.dark-message.el-message--success .el-message__icon {
+  color: #4ade80;
+}
+
+.dark-message.el-message--error {
+  --el-message-bg-color: #2e1c1c;
+  background-color: #2e1a1a;
+  border-color: #5a2d2d;
+}
+
+.dark-message.el-message--error .el-message__icon {
+  color: #f87171;
+}
+
+.dark-message.el-message--warning {
+  --el-message-bg-color: #2e2a1c;
+  background-color: #2e2a1a;
+  border-color: #5a4d2d;
+}
+
+.dark-message.el-message--warning .el-message__icon {
+  color: #fbbf24;
+}
+
+.dark-message.el-message--info {
+  --el-message-bg-color: #1c2a2e;
+  background-color: #1a2a2e;
+  border-color: #2d4d5a;
+}
+
+.dark-message.el-message--info .el-message__icon {
+  color: #60a5fa;
+}
+
+.dark-message.el-message .el-message__closeBtn {
+  color: #a1a1aa;
+}
+
+.dark-message.el-message .el-message__closeBtn:hover {
+  color: #f5f5f7;
+}
+
+/* Dark theme for Element Plus alert-style notifications */
+.dark-alert-notification.el-notification {
+  background-color: #1c1c1e;
+  border: 1px solid #3a3a3c;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 16px 20px;
+}
+
+.dark-alert-notification.el-notification .el-notification__title {
+  color: #f5f5f7;
+  font-weight: 600;
+}
+
+.dark-alert-notification.el-notification .el-notification__content {
+  color: #e5e5e7;
+  font-weight: 500;
+  margin-top: 0;
+}
+
+.dark-alert-notification.el-notification .el-notification__closeBtn {
+  color: #a1a1aa;
+}
+
+.dark-alert-notification.el-notification .el-notification__closeBtn:hover {
+  color: #f5f5f7;
+}
+
+/* Success variant */
+.dark-alert-notification.el-notification--success {
+  background-color: #1a2e1a;
+  border-color: #2d5a2d;
+}
+
+.dark-alert-notification.el-notification--success .el-notification__icon {
+  color: #4ade80;
+}
+
+/* Error variant */
+.dark-alert-notification.el-notification--error {
+  background-color: #2e1a1a;
+  border-color: #5a2d2d;
+}
+
+.dark-alert-notification.el-notification--error .el-notification__icon {
+  color: #f87171;
+}
+
+/* Warning variant */
+.dark-alert-notification.el-notification--warning {
+  background-color: #2e2a1a;
+  border-color: #5a4d2d;
+}
+
+.dark-alert-notification.el-notification--warning .el-notification__icon {
+  color: #fbbf24;
+}
+
+/* Info variant */
+.dark-alert-notification.el-notification--info {
+  background-color: #1a2a2e;
+  border-color: #2d4d5a;
+}
+
+.dark-alert-notification.el-notification--info .el-notification__icon {
+  color: #60a5fa;
+}
