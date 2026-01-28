@@ -182,10 +182,10 @@ export function useDoubleBubbleMap(options: DoubleBubbleMapOptions = {}) {
           label: sim,
           nodeType: 'bubble',
           diagramType: 'double_bubble_map',
-          isDraggable: true,
+          isDraggable: false,
           isSelectable: true,
         },
-        draggable: true,
+        draggable: false,
       })
     })
 
@@ -210,10 +210,10 @@ export function useDoubleBubbleMap(options: DoubleBubbleMapOptions = {}) {
           label: diff,
           nodeType: 'bubble',
           diagramType: 'double_bubble_map',
-          isDraggable: true,
+          isDraggable: false,
           isSelectable: true,
         },
-        draggable: true,
+        draggable: false,
       })
     })
 
@@ -230,10 +230,10 @@ export function useDoubleBubbleMap(options: DoubleBubbleMapOptions = {}) {
           label: diff,
           nodeType: 'bubble',
           diagramType: 'double_bubble_map',
-          isDraggable: true,
+          isDraggable: false,
           isSelectable: true,
         },
-        draggable: true,
+        draggable: false,
       })
     })
 

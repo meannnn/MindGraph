@@ -95,7 +95,7 @@ export function diagramNodeToVueFlowNode(
     topic: useCircleForTopic ? 'circle' : 'topic',
     center: useCircleForTopic ? 'circle' : 'topic',
     child: 'branch',
-    bubble: isCircleMap ? 'circle' : 'bubble', // bubble_map keeps BubbleNode for attributes
+    bubble: (isCircleMap || isBubbleMap || isDoubleBubbleMap) ? 'circle' : 'bubble', // bubble_map and double_bubble_map use CircleNode for attributes
     branch: 'branch',
     left: 'branch',
     right: 'branch',
@@ -107,8 +107,9 @@ export function diagramNodeToVueFlowNode(
   }
 
   const mappedType = nodeTypeMap[node.type] || 'branch'
-  // Topic, center, and boundary nodes are not draggable
-  const isDraggable = !['topic', 'center', 'boundary'].includes(node.type)
+  // Topic, center, boundary nodes, and bubble nodes in bubble_map/double_bubble_map are not draggable
+  const isDraggable = !['topic', 'center', 'boundary'].includes(node.type) && 
+    !((isBubbleMap || isDoubleBubbleMap) && node.type === 'bubble')
   // Boundary nodes are not selectable
   const isSelectable = node.type !== 'boundary'
 
@@ -116,6 +117,8 @@ export function diagramNodeToVueFlowNode(
   let dataNodeType: MindGraphNodeType = mappedType
   if (useCircleForTopic && (node.type === 'topic' || node.type === 'center')) {
     dataNodeType = 'topic' // Keep 'topic' in data for CircleNode styling
+  } else if ((isBubbleMap || isDoubleBubbleMap) && node.type === 'bubble') {
+    dataNodeType = 'bubble' // Keep 'bubble' in data for CircleNode styling (uses context style)
   }
 
   // Boundary nodes should render behind other nodes
@@ -128,7 +131,11 @@ export function diagramNodeToVueFlowNode(
 
   // Preserve custom data fields from node.data (like pairIndex, position for bridge maps)
   const customData = node.data || {}
-  
+
+  // Explicit layout dimensions for boundary so BoundaryNode never falls back to 400
+  const boundaryWidth = node.type === 'boundary' ? node.style?.width : undefined
+  const boundaryHeight = node.type === 'boundary' ? node.style?.height : undefined
+
   return {
     id: node.id,
     type: mappedType,
@@ -147,6 +154,9 @@ export function diagramNodeToVueFlowNode(
       originalNode: node,
       // Preserve custom fields from node.data (e.g., pairIndex, position for bridge maps)
       ...customData,
+      // Override with layout dimensions for boundary so BoundaryNode never uses 400 fallback
+      ...(boundaryWidth != null && { boundaryWidth }),
+      ...(boundaryHeight != null && { boundaryHeight }),
     },
     draggable: isDraggable,
     selectable: isSelectable,

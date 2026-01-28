@@ -23,6 +23,7 @@ import type { MindGraphNode } from '@/types'
 
 import BraceOverlay from './BraceOverlay.vue'
 import BridgeOverlay from './BridgeOverlay.vue'
+import CircleMapOverlay from './CircleMapOverlay.vue'
 import BraceEdge from './edges/BraceEdge.vue'
 // Import custom edge components
 import CurvedEdge from './edges/CurvedEdge.vue'
@@ -338,9 +339,6 @@ watch(
   () => nodes.value.length,
   (newLength, oldLength) => {
     if (props.fitViewOnInit && newLength > 0) {
-      // On initial canvas entry (oldLength === 0), always fit to full canvas
-      // This gives the user a full view of the diagram first
-      // Panel-aware fit only triggers when panels actually open/close
       const isInitialLoad = oldLength === 0
       setTimeout(() => {
         if (isInitialLoad) {
@@ -418,10 +416,12 @@ onMounted(() => {
   // Listen for inline text updates from node components
   unsubscribers.push(
     eventBus.on('node:text_updated', ({ nodeId, text }) => {
-      // Update the node text in the diagram store
       diagramStore.pushHistory('Edit node text')
       diagramStore.updateNode(nodeId, { text })
-      // Flow maps use fixed dimensions with text truncation, no layout recalculation needed
+      // Circle maps recalc layout from text; fit view so displayed size stays consistent
+      if (diagramStore.type === 'circle_map') {
+        setTimeout(() => fitDiagram(true), ANIMATION.FIT_DELAY)
+      }
     })
   )
 })
@@ -515,6 +515,9 @@ const gridConfig = {
 
       <!-- Bridge overlay for bridge maps (draws vertical lines, triangles, and dimension label) -->
       <BridgeOverlay />
+
+      <!-- Circle map overlay (draws outer boundary circle in flow coords; same center as layout) -->
+      <CircleMapOverlay />
     </VueFlow>
   </div>
 </template>

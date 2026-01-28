@@ -1,0 +1,240 @@
+/**
+ * DOM-based text measurement for circle map nodes
+ * Finds fontSize so text fits inside a circle (no truncation).
+ * Supports wrap (CJK) and no-wrap (English/numbers); no-wrap fits by width.
+ */
+
+const FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif"
+const MIN_FONT_SIZE = 6
+const TOPIC_DEFAULT_FONT_SIZE = 20
+const CONTEXT_DEFAULT_FONT_SIZE = 14
+const FONT_SIZE_STEP = 0.5
+const MAX_WIDTH_OFFSET = 16
+const BORDER_TOPIC = 3
+const BORDER_CONTEXT = 2
+
+/** Fixed font size for circle map context nodes (never change; grow circle instead). */
+export const CONTEXT_FONT_SIZE = 14
+/** Fixed font size for circle map topic node (never change; grow circle instead). */
+export const TOPIC_FONT_SIZE = 18
+
+let measureEl: HTMLDivElement | null = null
+
+function getMeasureEl(): HTMLDivElement {
+  if (measureEl && document.body.contains(measureEl)) {
+    return measureEl
+  }
+  measureEl = document.createElement('div')
+  measureEl.setAttribute('aria-hidden', 'true')
+  measureEl.style.cssText = [
+    'position:absolute',
+    'left:-9999px',
+    'top:0',
+    'visibility:hidden',
+    'pointer-events:none',
+    'white-space:pre-wrap',
+    'word-break:break-word',
+    'overflow-wrap:break-word',
+    'text-align:center',
+    'line-height:1.4',
+    'box-sizing:border-box',
+  ].join(';')
+  measureEl.style.fontFamily = FONT_FAMILY
+  document.body.appendChild(measureEl)
+  return measureEl
+}
+
+export interface MeasureTextFitOptions {
+  /** Circle diameter in px */
+  diameterPx: number
+  /** Topic (bold) vs context (normal) */
+  isTopic: boolean
+  /** Font size to try (default: theme default) */
+  fontSize?: number
+}
+
+/**
+ * True when text is mostly ASCII (English, digits, common punct.); use no-wrap + width-based fit.
+ */
+export function isMostlyAscii(text: string): boolean {
+  const t = (text || '').trim()
+  if (!t.length) return false
+  let ascii = 0
+  for (let i = 0; i < t.length; i++) {
+    if (t.charCodeAt(i) < 128) ascii++
+  }
+  return ascii / t.length >= 0.8
+}
+
+/**
+ * Measure if text fits in circle at given fontSize.
+ * Uses effective box: width = diameter - 16 - 2*border, height limit = diameter - 2*border.
+ */
+export function measureTextFitsInCircle(
+  text: string,
+  options: MeasureTextFitOptions
+): { fits: boolean; height: number } {
+  if (typeof document === 'undefined') {
+    return { fits: true, height: 0 }
+  }
+  const { diameterPx, isTopic, fontSize = isTopic ? TOPIC_DEFAULT_FONT_SIZE : CONTEXT_DEFAULT_FONT_SIZE } = options
+  const border = isTopic ? BORDER_TOPIC : BORDER_CONTEXT
+  const effectiveHeight = diameterPx - 2 * border
+  const maxW = Math.max(1, diameterPx - MAX_WIDTH_OFFSET - 2 * border)
+  const t = (text || '').trim() || ' '
+  const el = getMeasureEl()
+  el.style.width = `${maxW}px`
+  el.style.whiteSpace = 'pre-wrap'
+  el.style.padding = isTopic ? '8px 12px' : '4px 8px'
+  el.style.fontSize = `${fontSize}px`
+  el.style.fontWeight = isTopic ? 'bold' : 'normal'
+  el.textContent = t
+  const height = el.offsetHeight
+  const fits = height <= effectiveHeight
+  return { fits, height }
+}
+
+/**
+ * Measure width of text in single line (no-wrap) at given fontSize.
+ */
+function measureTextWidthNoWrap(
+  text: string,
+  options: { isTopic: boolean; fontSize: number }
+): number {
+  if (typeof document === 'undefined') return 0
+  const t = (text || '').trim() || ' '
+  const el = getMeasureEl()
+  el.style.width = 'max-content'
+  el.style.whiteSpace = 'nowrap'
+  el.style.padding = options.isTopic ? '8px 12px' : '4px 8px'
+  el.style.fontSize = `${options.fontSize}px`
+  el.style.fontWeight = options.isTopic ? 'bold' : 'normal'
+  el.textContent = t
+  return el.offsetWidth
+}
+
+/**
+ * Minimum diameter (px) so that text fits in one line at fixed fontSize (no-wrap).
+ * Used by circle map: fixed font, grow circle to fit. Padding matches layout (MAX_WIDTH_OFFSET, BORDER_*).
+ */
+export function computeMinDiameterForNoWrap(
+  text: string,
+  fontSize: number,
+  isTopic: boolean
+): number {
+  if (typeof document === 'undefined') {
+    return fallbackMinDiameterForNoWrap(text, fontSize, isTopic)
+  }
+  const border = isTopic ? BORDER_TOPIC : BORDER_CONTEXT
+  const w = measureTextWidthNoWrap(text, { isTopic, fontSize })
+  return Math.ceil(w + MAX_WIDTH_OFFSET + 2 * border)
+}
+
+function fallbackMinDiameterForNoWrap(text: string, fontSize: number, isTopic: boolean): number {
+  const len = (text || '').trim().length
+  if (len === 0) return isTopic ? 120 : 70
+  const border = isTopic ? BORDER_TOPIC : BORDER_CONTEXT
+  const approxCharWidth = isTopic ? 0.6 : 0.55
+  const w = len * fontSize * approxCharWidth + (isTopic ? 24 : 16)
+  return Math.ceil(w + MAX_WIDTH_OFFSET + 2 * border)
+}
+
+/**
+ * Find max fontSize such that no-wrap text fits in circle (width-based).
+ */
+export function computeFontSizeToFitCircleNoWrap(
+  text: string,
+  diameterPx: number,
+  isTopic: boolean
+): number {
+  if (typeof document === 'undefined') {
+    return fallbackFontSizeToFitNoWrap(text, diameterPx, isTopic)
+  }
+  const border = isTopic ? BORDER_TOPIC : BORDER_CONTEXT
+  const effectiveWidth = Math.max(1, diameterPx - MAX_WIDTH_OFFSET - 2 * border)
+  const maxFs = isTopic ? TOPIC_DEFAULT_FONT_SIZE : CONTEXT_DEFAULT_FONT_SIZE
+  let low = MIN_FONT_SIZE
+  let high = maxFs
+  let best = MIN_FONT_SIZE
+  const step = FONT_SIZE_STEP
+  while (high - low >= step) {
+    const mid = (low + high) / 2
+    const w = measureTextWidthNoWrap(text, { isTopic, fontSize: mid })
+    if (w <= effectiveWidth) {
+      best = mid
+      low = mid + step
+    } else {
+      high = mid - step
+    }
+  }
+  return Math.round(best * 10) / 10
+}
+
+/**
+ * Find max fontSize such that text fits in circle (DOM measurement).
+ * Wrap mode: fit by height. Use computeFontSizeToFitCircleNoWrap for English/no-wrap.
+ */
+export function computeFontSizeToFitCircle(
+  text: string,
+  diameterPx: number,
+  isTopic: boolean
+): number {
+  if (typeof document === 'undefined') {
+    return fallbackFontSizeToFit(text, diameterPx, isTopic)
+  }
+  const maxFs = isTopic ? TOPIC_DEFAULT_FONT_SIZE : CONTEXT_DEFAULT_FONT_SIZE
+  let low = MIN_FONT_SIZE
+  let high = maxFs
+  let best = MIN_FONT_SIZE
+  const step = FONT_SIZE_STEP
+  while (high - low >= step) {
+    const mid = (low + high) / 2
+    const { fits } = measureTextFitsInCircle(text, { diameterPx, isTopic, fontSize: mid })
+    if (fits) {
+      best = mid
+      low = mid + step
+    } else {
+      high = mid - step
+    }
+  }
+  return Math.round(best * 10) / 10
+}
+
+/**
+ * Uniform context fontSize: min over all context texts so longest fits.
+ * Uses no-wrap (width) for mostly-ASCII, wrap (height) otherwise.
+ */
+export function computeContextFontSize(texts: string[], uniformContextDiameterPx: number): number {
+  if (!texts.length) return CONTEXT_DEFAULT_FONT_SIZE
+  let minFs = CONTEXT_DEFAULT_FONT_SIZE
+  for (const t of texts) {
+    const fs = isMostlyAscii(t)
+      ? computeFontSizeToFitCircleNoWrap(t, uniformContextDiameterPx, false)
+      : computeFontSizeToFitCircle(t, uniformContextDiameterPx, false)
+    minFs = Math.min(minFs, fs)
+  }
+  return Math.max(MIN_FONT_SIZE, minFs)
+}
+
+function fallbackFontSizeToFit(text: string, diameterPx: number, isTopic: boolean): number {
+  const len = (text || '').trim().length
+  const inner = Math.max(1, diameterPx - MAX_WIDTH_OFFSET - 24)
+  const approxCharWidth = isTopic ? 0.55 : 0.5
+  const approxLines = Math.max(1, Math.ceil((len * approxCharWidth * 14) / inner))
+  const lineHeight = 1.4
+  const maxFontSizeByHeight = (diameterPx - 24) / (approxLines * lineHeight)
+  const maxFs = isTopic ? TOPIC_DEFAULT_FONT_SIZE : CONTEXT_DEFAULT_FONT_SIZE
+  const fs = Math.min(maxFs, maxFontSizeByHeight)
+  return Math.max(MIN_FONT_SIZE, Math.floor(fs))
+}
+
+function fallbackFontSizeToFitNoWrap(text: string, diameterPx: number, isTopic: boolean): number {
+  const len = (text || '').trim().length
+  if (len === 0) return isTopic ? TOPIC_DEFAULT_FONT_SIZE : CONTEXT_DEFAULT_FONT_SIZE
+  const border = isTopic ? BORDER_TOPIC : BORDER_CONTEXT
+  const effectiveWidth = diameterPx - MAX_WIDTH_OFFSET - 2 * border - (isTopic ? 24 : 16)
+  const approxCharWidth = isTopic ? 0.6 : 0.55
+  const maxFs = isTopic ? TOPIC_DEFAULT_FONT_SIZE : CONTEXT_DEFAULT_FONT_SIZE
+  const fs = effectiveWidth / (len * approxCharWidth)
+  return Math.max(MIN_FONT_SIZE, Math.min(maxFs, Math.floor(fs)))
+}

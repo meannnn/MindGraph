@@ -41,6 +41,8 @@ const props = withDefaults(
     maxLength?: number
     /** Whether to truncate text with ellipsis (single line) */
     truncate?: boolean
+    /** Force no-wrap (e.g. English/numbers in circle nodes); fit by width */
+    noWrap?: boolean
     /** Enable IME-style autocomplete */
     enableIME?: boolean
     /** Diagram type for IME context */
@@ -62,6 +64,7 @@ const props = withDefaults(
     minLength: 1,
     maxLength: 200,
     truncate: false,
+    noWrap: false,
     enableIME: false,
     diagramType: 'mindmap',
     mainTopics: () => [],
@@ -147,9 +150,9 @@ function countChineseCharacters(text: string): number {
   return matches ? matches.length : 0
 }
 
-// Computed: should prevent wrapping (if less than 5 Chinese characters)
-// Check editText when editing, props.text when displaying
+// Computed: should prevent wrapping (noWrap prop, or <5 Chinese chars)
 const shouldPreventWrap = computed(() => {
+  if (props.noWrap) return true
   const textToCheck = localIsEditing.value ? editText.value : props.text
   const chineseCount = countChineseCharacters(textToCheck)
   return chineseCount > 0 && chineseCount < 5

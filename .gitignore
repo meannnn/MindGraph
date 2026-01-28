@@ -203,3 +203,6 @@ storage/tiktoken_cache/
 
 # RAG test datasets
 services/knowledge/rag_chunk_test/rag-test/
+
+# Broken symlinks and nested directories
+MindGraph-main

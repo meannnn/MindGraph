@@ -49,7 +49,7 @@ function handleEditCancel() {
 
 <template>
   <div
-    class="bubble-node flex items-center justify-center rounded-full border-solid cursor-grab select-none"
+    class="bubble-node flex items-center justify-center rounded-full border-solid cursor-default select-none"
     :style="nodeStyle"
   >
     <InlineEditableText
@@ -80,9 +80,5 @@ function handleEditCancel() {
 .bubble-node:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transform: scale(1.02);
-}
-
-.bubble-node:active {
-  cursor: grabbing;
 }
 </style>

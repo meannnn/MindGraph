@@ -17,23 +17,31 @@ const { getNodeStyle } = useTheme({
 
 const defaultStyle = computed(() => getNodeStyle('boundary'))
 
-// Get dimensions from style prop (set by diagram store)
-// Check both data.style and originalNode.style for width/height
+// Dimensions: explicit layout values only. Vue Flow measures this node; intrinsic size must match layout.
 const width = computed(() => {
+  const explicit = (props.data as { boundaryWidth?: number }).boundaryWidth
+  if (explicit != null && explicit > 0) return explicit
   const directStyle = props.data.style as { width?: number; height?: number } | undefined
   const originalStyle = props.data.originalNode?.style as
     | { width?: number; height?: number }
     | undefined
-  return directStyle?.width || originalStyle?.width || 400
+  return directStyle?.width ?? originalStyle?.width ?? 400
 })
 
 const height = computed(() => {
+  const explicit = (props.data as { boundaryHeight?: number }).boundaryHeight
+  if (explicit != null && explicit > 0) return explicit
   const directStyle = props.data.style as { width?: number; height?: number } | undefined
   const originalStyle = props.data.originalNode?.style as
     | { width?: number; height?: number }
     | undefined
-  return directStyle?.height || originalStyle?.height || 400
+  return directStyle?.height ?? originalStyle?.height ?? 400
 })
+
+const rootStyle = computed(() => ({
+  width: `${width.value}px`,
+  height: `${height.value}px`,
+}))
 
 // Outer circle colors matching old JS bubble-map-renderer.js THEME
 // outerCircleStroke: #666666, outerCircleStrokeWidth: 2
@@ -47,13 +55,17 @@ const strokeWidth = computed(
 </script>
 
 <template>
-  <div class="boundary-node pointer-events-none w-full h-full">
+  <div
+    class="boundary-node pointer-events-none flex shrink-0"
+    :style="rootStyle"
+  >
     <svg
-      class="boundary-svg w-full h-full"
+      class="boundary-svg block"
+      :width="width"
+      :height="height"
       :viewBox="`0 0 ${width} ${height}`"
       preserveAspectRatio="xMidYMid meet"
     >
-      <!-- Perfect circle boundary ring -->
       <circle
         :cx="width / 2"
         :cy="height / 2"
@@ -68,13 +80,10 @@ const strokeWidth = computed(
 
 <style scoped>
 .boundary-node {
-  /* Fill the Vue Flow node wrapper */
-  width: 100%;
-  height: 100%;
+  overflow: visible;
 }
 
 .boundary-svg {
-  display: block;
   overflow: visible;
 }
 </style>

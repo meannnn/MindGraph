@@ -42,6 +42,8 @@ export interface NodeStyle {
   width?: number
   height?: number
   size?: number // Uniform size for perfect circles (diameter)
+  /** Force no-wrap (e.g. English/numbers in circle map); fit by width */
+  noWrap?: boolean
 }
 
 export interface Position {
