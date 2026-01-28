@@ -87,9 +87,9 @@ function handleEditCancel() {
         :is-editing="isEditing"
         :max-width="`${Math.max(0, circleSize - 16 - 2 * borderWidth)}px`"
         text-align="center"
-        :text-class="isTopicNode ? 'px-3 py-2' : 'px-2 py-1'"
-        :no-wrap="data.diagramType === 'circle_map' ? true : !!data.style?.noWrap"
-        :truncate="data.diagramType === 'circle_map' ? false : undefined"
+        :text-class="''"
+        :no-wrap="data.diagramType === 'circle_map' || data.diagramType === 'bubble_map' || data.diagramType === 'double_bubble_map' ? true : !!data.style?.noWrap"
+        :truncate="data.diagramType === 'circle_map' || data.diagramType === 'bubble_map' || data.diagramType === 'double_bubble_map' ? false : undefined"
         @save="handleTextSave"
         @cancel="handleEditCancel"
         @edit-start="isEditing = true"
@@ -126,6 +126,7 @@ function handleEditCancel() {
   min-height: 0;
   padding: 0;
   margin: 0;
+  text-align: center;
 }
 
 .context-circle:hover {

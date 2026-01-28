@@ -238,6 +238,16 @@ export const useSavedDiagramsStore = defineStore('savedDiagrams', () => {
     }
 
     try {
+      // Debug: log spec before saving
+      console.log('[SavedDiagrams] Saving diagram:', {
+        title,
+        diagram_type: diagramType,
+        spec_keys: Object.keys(spec || {}),
+        spec_sample: diagramType === 'bubble_map' 
+          ? { topic: (spec as { topic?: string })?.topic, attributes_count: (spec as { attributes?: unknown[] })?.attributes?.length }
+          : '...',
+      })
+
       const response = await fetch('/api/diagrams', {
         method: 'POST',
         credentials: 'same-origin',
@@ -260,7 +270,23 @@ export const useSavedDiagramsStore = defineStore('savedDiagrams', () => {
           error.value = 'Diagram limit reached'
           return null
         }
-        throw new Error(`Failed to save diagram: ${response.status}`)
+        // Try to get error details from response
+        let errorMessage = `Failed to save diagram: ${response.status}`
+        try {
+          const errorData = await response.json()
+          if (errorData.detail) {
+            errorMessage = `Failed to save diagram: ${errorData.detail}`
+            console.error('[SavedDiagrams] Save error details:', errorData)
+          }
+        } catch {
+          // Ignore JSON parse errors
+        }
+        console.error('[SavedDiagrams] Save failed:', {
+          status: response.status,
+          error: errorMessage,
+          spec: spec,
+        })
+        throw new Error(errorMessage)
       }
 
       const saved: SavedDiagramFull = await response.json()

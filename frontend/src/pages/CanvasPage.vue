@@ -265,14 +265,108 @@ function getDiagramTitle(): string {
 
 /**
  * Get diagram spec for saving
+ * Converts DiagramData back to diagram-type-specific spec format
  */
 function getDiagramSpec(): Record<string, unknown> | null {
-  if (!diagramStore.data) return null
+  if (!diagramStore.data || !diagramStore.type) return null
 
+  const diagramType = diagramStore.type
+  const nodes = diagramStore.data.nodes
+  const connections = diagramStore.data.connections
+
+  // For bubble_map and double_bubble_map, convert back to spec format
+  if (diagramType === 'bubble_map') {
+    const topicNode = nodes.find((n) => n.id === 'topic')
+    const topicText = topicNode?.text?.trim() || ''
+    
+    // Backend validation requires non-empty topic
+    if (!topicText) {
+      console.warn('[CanvasPage] Bubble map topic is empty, cannot save')
+      return null
+    }
+
+    const bubbleNodes = nodes
+      .filter((n) => n.id.startsWith('bubble-'))
+      .sort((a, b) => {
+        const aIndex = parseInt(a.id.replace('bubble-', ''), 10)
+        const bIndex = parseInt(b.id.replace('bubble-', ''), 10)
+        return aIndex - bIndex
+      })
+
+    // Filter out empty attributes and ensure we have valid data
+    const attributes = bubbleNodes
+      .map((n) => (n.text || '').trim())
+      .filter((text) => text.length > 0)
+
+    // Backend validation requires at least 3 attributes
+    // If we have fewer than 3, we can't save (this should be rare in normal usage)
+    if (attributes.length < 3) {
+      console.warn('[CanvasPage] Bubble map has fewer than 3 attributes, cannot save', {
+        attributesCount: attributes.length,
+        attributes: attributes,
+      })
+      // Return null to skip saving
+      return null
+    }
+
+    const spec: Record<string, unknown> = {
+      topic: topicText,
+      attributes: attributes,
+    }
+
+    // Preserve metadata (backend may or may not accept these, but they're needed for frontend)
+    if (diagramStore.data._customPositions) {
+      spec._customPositions = diagramStore.data._customPositions
+    }
+    if (diagramStore.data._bubbleMapLayout) {
+      spec._bubbleMapLayout = diagramStore.data._bubbleMapLayout
+    }
+    if (diagramStore.data._node_dimensions) {
+      spec._node_dimensions = diagramStore.data._node_dimensions
+    }
+
+    return spec
+  }
+
+  if (diagramType === 'double_bubble_map') {
+    const leftTopicNode = nodes.find((n) => n.id === 'left-topic')
+    const rightTopicNode = nodes.find((n) => n.id === 'right-topic')
+    const simNodes = nodes
+      .filter((n) => n.id.startsWith('similarity-'))
+      .sort((a, b) => {
+        const aIndex = parseInt(a.id.replace('similarity-', ''), 10)
+        const bIndex = parseInt(b.id.replace('similarity-', ''), 10)
+        return aIndex - bIndex
+      })
+    const leftDiffNodes = nodes
+      .filter((n) => n.id.startsWith('left-diff-'))
+      .sort((a, b) => {
+        const aIndex = parseInt(a.id.replace('left-diff-', ''), 10)
+        const bIndex = parseInt(b.id.replace('left-diff-', ''), 10)
+        return aIndex - bIndex
+      })
+    const rightDiffNodes = nodes
+      .filter((n) => n.id.startsWith('right-diff-'))
+      .sort((a, b) => {
+        const aIndex = parseInt(a.id.replace('right-diff-', ''), 10)
+        const bIndex = parseInt(b.id.replace('right-diff-', ''), 10)
+        return aIndex - bIndex
+      })
+
+    return {
+      left: leftTopicNode?.text || '',
+      right: rightTopicNode?.text || '',
+      similarities: simNodes.map((n) => n.text),
+      leftDifferences: leftDiffNodes.map((n) => n.text),
+      rightDifferences: rightDiffNodes.map((n) => n.text),
+    }
+  }
+
+  // For other diagram types, use generic format
   return {
-    type: diagramStore.type,
-    nodes: diagramStore.data.nodes,
-    connections: diagramStore.data.connections,
+    type: diagramType,
+    nodes,
+    connections,
     _customPositions: diagramStore.data._customPositions,
     _node_styles: diagramStore.data._node_styles,
   }

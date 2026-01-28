@@ -238,3 +238,90 @@ function fallbackFontSizeToFitNoWrap(text: string, diameterPx: number, isTopic: 
   const fs = effectiveWidth / (len * approxCharWidth)
   return Math.max(MIN_FONT_SIZE, Math.min(maxFs, Math.floor(fs)))
 }
+
+/**
+ * Measure text dimensions using SVG getBBox() method (as per documentation)
+ * This provides the most accurate measurement for text rendering
+ * @param text - Text content
+ * @param fontSize - Font size in pixels
+ * @param isTopic - Whether this is a topic node (affects font weight)
+ * @returns Object with width and height in pixels
+ */
+function measureTextWithSVG(
+  text: string,
+  fontSize: number,
+  isTopic: boolean
+): { width: number; height: number } {
+  if (typeof document === 'undefined') {
+    // Fallback: estimate dimensions
+    const len = text.trim().length
+    const approxCharWidth = fontSize * (isTopic ? 0.6 : 0.55)
+    const approxCharHeight = fontSize * 1.4
+    return {
+      width: len * approxCharWidth,
+      height: approxCharHeight,
+    }
+  }
+
+  // 使用 DOM 测量（与项目现有模式一致，更可靠）
+  // 参考文档要求：测量文字宽度和高度，使用对角线计算半径
+  const el = getMeasureEl()
+  el.style.width = 'max-content'
+  el.style.whiteSpace = 'nowrap' // 确保一行显示（符合文档要求）
+  el.style.fontSize = `${fontSize}px`
+  el.style.fontWeight = isTopic ? 'bold' : 'normal'
+  el.style.fontFamily = FONT_FAMILY
+  el.style.padding = '0'
+  el.style.lineHeight = '1.4'
+  el.style.boxSizing = 'content-box'
+  el.textContent = text.trim()
+  
+  // 测量宽度和高度
+  const width = el.offsetWidth || 0
+  const height = el.offsetHeight || fontSize * 1.4
+  
+  return {
+    width,
+    height,
+  }
+}
+
+/**
+ * Calculate bubble map node radius based on text length
+ * Uses SVG getBBox() for accurate measurement and diagonal calculation
+ * as per BUBBLE_MAP_TEXT_ADAPTATION.md and BUBBLE_MAP_SIZE_CALCULATION.md
+ * 
+ * Formula: radius = sqrt(width² + height²) / 2 + padding
+ * 
+ * @param text - Text content
+ * @param fontSize - Font size to use for measurement
+ * @param padding - Padding around text (default: 10 for attributes, 20 for topic)
+ * @param minRadius - Minimum radius (default: 30)
+ * @param isTopic - Whether this is a topic node (affects font weight)
+ * @returns Radius in pixels
+ */
+export function calculateBubbleMapRadius(
+  text: string,
+  fontSize: number = CONTEXT_DEFAULT_FONT_SIZE,
+  padding: number = 10,
+  minRadius: number = 30,
+  isTopic: boolean = false
+): number {
+  if (!text || !text.trim()) {
+    return minRadius
+  }
+
+  // Measure text dimensions (width and height)
+  const { width, height } = measureTextWithSVG(text.trim(), fontSize, isTopic)
+
+  // 如果测量失败（width/height 为 0），使用估算值
+  const measuredWidth = width || text.trim().length * fontSize * (isTopic ? 0.6 : 0.55)
+  const measuredHeight = height || fontSize * 1.4
+
+  // Calculate radius using diagonal: sqrt(width² + height²) / 2 + padding
+  // 符合文档 BUBBLE_MAP_SIZE_CALCULATION.md 的要求
+  const diagonal = Math.sqrt(measuredWidth * measuredWidth + measuredHeight * measuredHeight)
+  const radius = Math.ceil(diagonal / 2 + padding)
+
+  return Math.max(minRadius, radius)
+}

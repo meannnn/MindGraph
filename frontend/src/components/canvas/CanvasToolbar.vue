@@ -27,6 +27,7 @@ import {
 
 import { useNotifications } from '@/composables'
 import { useAutoComplete, useLanguage } from '@/composables'
+import { getDiagramOperations } from '@/composables/useDiagramOperations'
 import { useDiagramStore } from '@/stores'
 
 const notify = useNotifications()
@@ -102,7 +103,7 @@ function handleRedo() {
 function handleAddNode() {
   const diagramType = diagramStore.type
 
-  if (!diagramStore.data?.nodes) {
+  if (!diagramStore.data) {
     notify.warning('请先创建图示')
     return
   }
@@ -128,6 +129,83 @@ function handleAddNode() {
     return
   }
 
+  // For bubble_map and double_bubble_map, use useDiagramOperations
+  if (diagramType === 'bubble_map' || diagramType === 'double_bubble_map') {
+    const operations = getDiagramOperations()
+    // Set diagram type and language to ensure operations are initialized correctly
+    operations.setDiagramType(diagramType)
+    operations.setLanguage(isZh.value ? 'zh' : 'en')
+    
+    if (!operations.operations.value) {
+      notify.warning('无法添加节点：操作未初始化')
+      return
+    }
+
+    // Build spec from current nodes
+    const spec: Record<string, unknown> = {}
+    
+    if (diagramType === 'bubble_map') {
+      const topicNode = diagramStore.data.nodes.find((n) => n.id === 'topic')
+      const bubbleNodes = diagramStore.data.nodes
+        .filter((n) => n.id.startsWith('bubble-'))
+        .sort((a, b) => {
+          const aIndex = parseInt(a.id.replace('bubble-', ''), 10)
+          const bIndex = parseInt(b.id.replace('bubble-', ''), 10)
+          return aIndex - bIndex
+        })
+      spec.topic = topicNode?.text || ''
+      spec.attributes = bubbleNodes.map((n) => n.text)
+      // Preserve metadata
+      if (diagramStore.data._customPositions) {
+        spec._customPositions = diagramStore.data._customPositions
+      }
+      if (diagramStore.data._bubbleMapLayout) {
+        spec._bubbleMapLayout = diagramStore.data._bubbleMapLayout
+      }
+    } else if (diagramType === 'double_bubble_map') {
+      const leftTopicNode = diagramStore.data.nodes.find((n) => n.id === 'left-topic')
+      const rightTopicNode = diagramStore.data.nodes.find((n) => n.id === 'right-topic')
+      const simNodes = diagramStore.data.nodes
+        .filter((n) => n.id.startsWith('similarity-'))
+        .sort((a, b) => {
+          const aIndex = parseInt(a.id.replace('similarity-', ''), 10)
+          const bIndex = parseInt(b.id.replace('similarity-', ''), 10)
+          return aIndex - bIndex
+        })
+      const leftDiffNodes = diagramStore.data.nodes
+        .filter((n) => n.id.startsWith('left-diff-'))
+        .sort((a, b) => {
+          const aIndex = parseInt(a.id.replace('left-diff-', ''), 10)
+          const bIndex = parseInt(b.id.replace('left-diff-', ''), 10)
+          return aIndex - bIndex
+        })
+      const rightDiffNodes = diagramStore.data.nodes
+        .filter((n) => n.id.startsWith('right-diff-'))
+        .sort((a, b) => {
+          const aIndex = parseInt(a.id.replace('right-diff-', ''), 10)
+          const bIndex = parseInt(b.id.replace('right-diff-', ''), 10)
+          return aIndex - bIndex
+        })
+      spec.left = leftTopicNode?.text || ''
+      spec.right = rightTopicNode?.text || ''
+      spec.similarities = simNodes.map((n) => n.text)
+      spec.leftDifferences = leftDiffNodes.map((n) => n.text)
+      spec.rightDifferences = rightDiffNodes.map((n) => n.text)
+    }
+
+    const result = operations.operations.value.addNode(spec)
+
+    if (result) {
+      // Reload the spec to trigger layout recalculation
+      diagramStore.loadFromSpec(spec, diagramType)
+      diagramStore.pushHistory('添加节点')
+      notify.success('已添加新节点')
+    } else {
+      notify.warning('添加节点失败')
+    }
+    return
+  }
+
   // For other diagram types, show under development message
   notify.info('增加节点功能开发中')
 }
@@ -135,19 +213,24 @@ function handleAddNode() {
 function handleDeleteNode() {
   const diagramType = diagramStore.type
 
-  if (!diagramStore.data?.nodes) {
+  if (!diagramStore.data) {
     notify.warning('请先创建图示')
     return
   }
 
   // Check if any nodes are selected
   if (diagramStore.selectedNodes.length === 0) {
-    notify.warning('请先选择要删除的节点')
+    notify.warning('请选择需要删除的节点')
     return
   }
 
   // For circle maps, delete selected context nodes
   if (diagramType === 'circle_map') {
+    if (diagramStore.selectedNodes.includes('topic')) {
+      notify.warning('主题词节点不可被删除')
+      return
+    }
+
     let deletedCount = 0
 
     // Delete each selected node (skip topic/boundary)
@@ -173,6 +256,123 @@ function handleDeleteNode() {
       notify.success(`已删除 ${deletedCount} 个节点`)
     } else {
       notify.warning('无法删除主题节点')
+    }
+    return
+  }
+
+  // For bubble_map and double_bubble_map, use useDiagramOperations
+  if (diagramType === 'bubble_map' || diagramType === 'double_bubble_map') {
+    // Check if any nodes are selected
+    if (diagramStore.selectedNodes.length === 0) {
+      notify.warning('请选择需要删除的节点')
+      return
+    }
+
+    // Check if center node (topic) is selected for bubble_map
+    if (diagramType === 'bubble_map' && diagramStore.selectedNodes.includes('topic')) {
+      notify.warning('主题词节点不可被删除')
+      return
+    }
+
+    // Check if center nodes are selected for double_bubble_map
+    if (
+      diagramType === 'double_bubble_map' &&
+      (diagramStore.selectedNodes.includes('left-topic') ||
+        diagramStore.selectedNodes.includes('right-topic'))
+    ) {
+      notify.warning('主题词节点不可被删除')
+      return
+    }
+
+    const operations = getDiagramOperations()
+    // Set diagram type and language to ensure operations are initialized correctly
+    operations.setDiagramType(diagramType)
+    operations.setLanguage(isZh.value ? 'zh' : 'en')
+    
+    if (!operations.operations.value) {
+      notify.warning('无法删除节点：操作未初始化')
+      return
+    }
+
+    // Build spec from current nodes
+    const spec: Record<string, unknown> = {}
+    
+    if (diagramType === 'bubble_map') {
+      const topicNode = diagramStore.data.nodes.find((n) => n.id === 'topic')
+      const bubbleNodes = diagramStore.data.nodes
+        .filter((n) => n.id.startsWith('bubble-'))
+        .sort((a, b) => {
+          const aIndex = parseInt(a.id.replace('bubble-', ''), 10)
+          const bIndex = parseInt(b.id.replace('bubble-', ''), 10)
+          return aIndex - bIndex
+        })
+      spec.topic = topicNode?.text || ''
+      spec.attributes = bubbleNodes.map((n) => n.text)
+      // Preserve metadata
+      if (diagramStore.data._customPositions) {
+        spec._customPositions = diagramStore.data._customPositions
+      }
+      if (diagramStore.data._bubbleMapLayout) {
+        spec._bubbleMapLayout = diagramStore.data._bubbleMapLayout
+      }
+    } else if (diagramType === 'double_bubble_map') {
+      const leftTopicNode = diagramStore.data.nodes.find((n) => n.id === 'left-topic')
+      const rightTopicNode = diagramStore.data.nodes.find((n) => n.id === 'right-topic')
+      const simNodes = diagramStore.data.nodes
+        .filter((n) => n.id.startsWith('similarity-'))
+        .sort((a, b) => {
+          const aIndex = parseInt(a.id.replace('similarity-', ''), 10)
+          const bIndex = parseInt(b.id.replace('similarity-', ''), 10)
+          return aIndex - bIndex
+        })
+      const leftDiffNodes = diagramStore.data.nodes
+        .filter((n) => n.id.startsWith('left-diff-'))
+        .sort((a, b) => {
+          const aIndex = parseInt(a.id.replace('left-diff-', ''), 10)
+          const bIndex = parseInt(b.id.replace('left-diff-', ''), 10)
+          return aIndex - bIndex
+        })
+      const rightDiffNodes = diagramStore.data.nodes
+        .filter((n) => n.id.startsWith('right-diff-'))
+        .sort((a, b) => {
+          const aIndex = parseInt(a.id.replace('right-diff-', ''), 10)
+          const bIndex = parseInt(b.id.replace('right-diff-', ''), 10)
+          return aIndex - bIndex
+        })
+      spec.left = leftTopicNode?.text || ''
+      spec.right = rightTopicNode?.text || ''
+      spec.similarities = simNodes.map((n) => n.text)
+      spec.leftDifferences = leftDiffNodes.map((n) => n.text)
+      spec.rightDifferences = rightDiffNodes.map((n) => n.text)
+    }
+
+    // Filter out topic nodes from selectedNodes before deleting
+    const nodesToDelete =
+      diagramType === 'bubble_map'
+        ? diagramStore.selectedNodes.filter((id) => id !== 'topic')
+        : diagramStore.selectedNodes.filter(
+            (id) => id !== 'left-topic' && id !== 'right-topic'
+          )
+
+    if (nodesToDelete.length === 0) {
+      // All selected nodes were topic nodes, already warned above
+      return
+    }
+
+    const result = operations.operations.value.deleteNodes(spec, nodesToDelete)
+
+    if (result && result.deletedIds.length > 0) {
+      // Reload the spec to trigger layout recalculation
+      diagramStore.loadFromSpec(spec, diagramType)
+      diagramStore.clearSelection()
+      diagramStore.pushHistory('删除节点')
+      notify.success(`已删除 ${result.deletedIds.length} 个节点`)
+    } else {
+      if (result?.warnings && result.warnings.length > 0) {
+        notify.warning(result.warnings[0])
+      } else {
+        notify.warning('删除节点失败')
+      }
     }
     return
   }

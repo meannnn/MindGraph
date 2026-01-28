@@ -6,7 +6,7 @@
  *
  * Migrated from archive/static/js/managers/editor/diagram-operations-loader.js
  */
-import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 
 import type { DiagramSpec, DiagramType } from '@/types'
 
@@ -102,11 +102,11 @@ const DIAGRAM_CONFIGS: Record<string, DiagramConfig> = {
   },
   // Double Bubble Map - old JS uses '新相似点' and '左不同点'/'右不同点'
   double_bubble_map: {
-    nodeTypes: ['topic1', 'topic2', 'similarity', 'difference'],
+    nodeTypes: ['topic1', 'topic2', 'similarity', 'left_difference', 'right_difference'],
     arrayFields: {
       similarity: 'similarities',
-      left_difference: 'left_differences',
-      right_difference: 'right_differences',
+      left_difference: 'leftDifferences',
+      right_difference: 'rightDifferences',
     },
     protectedNodes: ['topic1', 'topic2'],
     defaultTexts: {
@@ -234,6 +234,8 @@ export function useDiagramOperations(options: UseDiagramOperationsOptions = {}) 
   ): { type: string; index?: number; field?: string } | null {
     if (!config.value || !spec) return null
 
+    const type = effectiveType.value
+
     // Check main/protected nodes first
     for (const protectedType of config.value.protectedNodes) {
       if (nodeId === protectedType || nodeId.startsWith(`${protectedType}_`)) {
@@ -241,7 +243,55 @@ export function useDiagramOperations(options: UseDiagramOperationsOptions = {}) 
       }
     }
 
-    // Check array fields
+    // Special handling for bubble_map: bubble-{index} format
+    if (type === 'bubble_map') {
+      if (nodeId === 'topic') {
+        return { type: 'topic' }
+      }
+      const bubbleMatch = nodeId.match(/^bubble-(\d+)$/)
+      if (bubbleMatch) {
+        const index = parseInt(bubbleMatch[1], 10)
+        const attributes = (spec as Record<string, unknown>).attributes
+        if (Array.isArray(attributes) && index < attributes.length) {
+          return { type: 'attribute', index, field: 'attributes' }
+        }
+      }
+      return null
+    }
+
+    // Special handling for double_bubble_map: similarity-{index}, left-diff-{index}, right-diff-{index}
+    if (type === 'double_bubble_map') {
+      if (nodeId === 'left-topic' || nodeId === 'right-topic') {
+        return { type: nodeId === 'left-topic' ? 'topic1' : 'topic2' }
+      }
+      const simMatch = nodeId.match(/^similarity-(\d+)$/)
+      if (simMatch) {
+        const index = parseInt(simMatch[1], 10)
+        const similarities = (spec as Record<string, unknown>).similarities
+        if (Array.isArray(similarities) && index < similarities.length) {
+          return { type: 'similarity', index, field: 'similarities' }
+        }
+      }
+      const leftDiffMatch = nodeId.match(/^left-diff-(\d+)$/)
+      if (leftDiffMatch) {
+        const index = parseInt(leftDiffMatch[1], 10)
+        const leftDifferences = (spec as Record<string, unknown>).leftDifferences
+        if (Array.isArray(leftDifferences) && index < leftDifferences.length) {
+          return { type: 'left_difference', index, field: 'leftDifferences' }
+        }
+      }
+      const rightDiffMatch = nodeId.match(/^right-diff-(\d+)$/)
+      if (rightDiffMatch) {
+        const index = parseInt(rightDiffMatch[1], 10)
+        const rightDifferences = (spec as Record<string, unknown>).rightDifferences
+        if (Array.isArray(rightDifferences) && index < rightDifferences.length) {
+          return { type: 'right_difference', index, field: 'rightDifferences' }
+        }
+      }
+      return null
+    }
+
+    // Check array fields (default pattern: nodeType_index)
     for (const [nodeType, field] of Object.entries(config.value.arrayFields)) {
       const arr = (spec as Record<string, unknown>)[field]
       if (Array.isArray(arr)) {
@@ -294,11 +344,27 @@ export function useDiagramOperations(options: UseDiagramOperationsOptions = {}) 
         arr.push(newText)
 
         const index = arr.length - 1
-        const newNodeId = `${addType}_${index}`
+        // Generate nodeId based on diagram type
+        let newNodeId: string
+        if (type === 'bubble_map' && addType === 'attribute') {
+          newNodeId = `bubble-${index}`
+        } else if (type === 'double_bubble_map') {
+          if (addType === 'similarity') {
+            newNodeId = `similarity-${index}`
+          } else if (addType === 'left_difference') {
+            newNodeId = `left-diff-${index}`
+          } else if (addType === 'right_difference') {
+            newNodeId = `right-diff-${index}`
+          } else {
+            newNodeId = `${addType}_${index}`
+          }
+        } else {
+          newNodeId = `${addType}_${index}`
+        }
 
-        // For circle_map, clear custom positions to trigger even redistribution
+        // For circle_map and bubble_map, clear custom positions to trigger even redistribution
         // This matches the original D3 behavior where new nodes are evenly spaced
-        if (type === 'circle_map') {
+        if (type === 'circle_map' || type === 'bubble_map') {
           delete (spec as Record<string, unknown>)._customPositions
         }
 
@@ -359,19 +425,35 @@ export function useDiagramOperations(options: UseDiagramOperationsOptions = {}) 
               arr.splice(index, 1)
               deletedIndices.push(index)
 
-              // Find the node type for this field
+              // Find the node type for this field and generate correct nodeId
               const nodeType = Object.entries(cfg.arrayFields).find(([, f]) => f === field)?.[0]
               if (nodeType) {
-                deletedIds.push(`${nodeType}_${index}`)
+                let deletedNodeId: string
+                if (type === 'bubble_map' && nodeType === 'attribute') {
+                  deletedNodeId = `bubble-${index}`
+                } else if (type === 'double_bubble_map') {
+                  if (nodeType === 'similarity') {
+                    deletedNodeId = `similarity-${index}`
+                  } else if (nodeType === 'left_difference') {
+                    deletedNodeId = `left-diff-${index}`
+                  } else if (nodeType === 'right_difference') {
+                    deletedNodeId = `right-diff-${index}`
+                  } else {
+                    deletedNodeId = `${nodeType}_${index}`
+                  }
+                } else {
+                  deletedNodeId = `${nodeType}_${index}`
+                }
+                deletedIds.push(deletedNodeId)
               }
             }
           }
         }
 
         if (deletedIds.length > 0) {
-          // For circle_map, clear custom positions to trigger even redistribution
+          // For circle_map and bubble_map, clear custom positions to trigger even redistribution
           // This matches the original D3 behavior where remaining nodes are evenly spaced
-          if (type === 'circle_map') {
+          if (type === 'circle_map' || type === 'bubble_map') {
             delete (spec as Record<string, unknown>)._customPositions
           }
 
@@ -743,9 +825,9 @@ export function useDiagramOperations(options: UseDiagramOperationsOptions = {}) 
     eventBus.removeAllListenersForOwner(ownerId)
   }
 
-  onUnmounted(() => {
-    destroy()
-  })
+  // Note: onUnmounted removed because getDiagramOperations() creates a global singleton
+  // that is not associated with any component instance. If cleanup is needed,
+  // call destroy() manually or handle cleanup elsewhere.
 
   // =========================================================================
   // Return

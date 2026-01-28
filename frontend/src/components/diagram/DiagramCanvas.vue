@@ -16,6 +16,7 @@ import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { MiniMap } from '@vue-flow/minimap'
 
 import { eventBus } from '@/composables/useEventBus'
+import { getDiagramOperations } from '@/composables/useDiagramOperations'
 import { useTheme } from '@/composables/useTheme'
 import { ANIMATION, FIT_PADDING, GRID, PANEL, ZOOM } from '@/config/uiConfig'
 import { useDiagramStore, usePanelsStore } from '@/stores'
@@ -417,10 +418,91 @@ onMounted(() => {
   unsubscribers.push(
     eventBus.on('node:text_updated', ({ nodeId, text }) => {
       diagramStore.pushHistory('Edit node text')
-      diagramStore.updateNode(nodeId, { text })
-      // Circle maps recalc layout from text; fit view so displayed size stays consistent
-      if (diagramStore.type === 'circle_map') {
-        setTimeout(() => fitDiagram(true), ANIMATION.FIT_DELAY)
+      
+      const diagramType = diagramStore.type
+      
+      // For bubble_map and double_bubble_map, update spec and reload to recalculate radius
+      if (diagramType === 'bubble_map' || diagramType === 'double_bubble_map') {
+        const operations = getDiagramOperations()
+        operations.setDiagramType(diagramType)
+        // Language is set automatically by useDiagramOperations based on store
+        
+        if (operations.operations.value && diagramStore.data) {
+          // First, update the node in data (so we have the new text)
+          diagramStore.updateNode(nodeId, { text })
+          
+          // Build spec from updated nodes
+          const spec: Record<string, unknown> = {}
+          
+          if (diagramType === 'bubble_map') {
+            const topicNode = diagramStore.data.nodes.find((n) => n.id === 'topic')
+            const bubbleNodes = diagramStore.data.nodes
+              .filter((n) => n.id.startsWith('bubble-'))
+              .sort((a, b) => {
+                const aIndex = parseInt(a.id.replace('bubble-', ''), 10)
+                const bIndex = parseInt(b.id.replace('bubble-', ''), 10)
+                return aIndex - bIndex
+              })
+            spec.topic = topicNode?.text || ''
+            spec.attributes = bubbleNodes.map((n) => n.text)
+            // Preserve metadata
+            if (diagramStore.data._customPositions) {
+              spec._customPositions = diagramStore.data._customPositions
+            }
+            if (diagramStore.data._bubbleMapLayout) {
+              spec._bubbleMapLayout = diagramStore.data._bubbleMapLayout
+            }
+            if (diagramStore.data._node_dimensions) {
+              spec._node_dimensions = diagramStore.data._node_dimensions
+            }
+          } else if (diagramType === 'double_bubble_map') {
+            const leftTopicNode = diagramStore.data.nodes.find((n) => n.id === 'left-topic')
+            const rightTopicNode = diagramStore.data.nodes.find((n) => n.id === 'right-topic')
+            const simNodes = diagramStore.data.nodes
+              .filter((n) => n.id.startsWith('similarity-'))
+              .sort((a, b) => {
+                const aIndex = parseInt(a.id.replace('similarity-', ''), 10)
+                const bIndex = parseInt(b.id.replace('similarity-', ''), 10)
+                return aIndex - bIndex
+              })
+            const leftDiffNodes = diagramStore.data.nodes
+              .filter((n) => n.id.startsWith('left-diff-'))
+              .sort((a, b) => {
+                const aIndex = parseInt(a.id.replace('left-diff-', ''), 10)
+                const bIndex = parseInt(b.id.replace('left-diff-', ''), 10)
+                return aIndex - bIndex
+              })
+            const rightDiffNodes = diagramStore.data.nodes
+              .filter((n) => n.id.startsWith('right-diff-'))
+              .sort((a, b) => {
+                const aIndex = parseInt(a.id.replace('right-diff-', ''), 10)
+                const bIndex = parseInt(b.id.replace('right-diff-', ''), 10)
+                return aIndex - bIndex
+              })
+            spec.left = leftTopicNode?.text || ''
+            spec.right = rightTopicNode?.text || ''
+            spec.similarities = simNodes.map((n) => n.text)
+            spec.leftDifferences = leftDiffNodes.map((n) => n.text)
+            spec.rightDifferences = rightDiffNodes.map((n) => n.text)
+          }
+          
+          // Reload spec to trigger radius recalculation (loadBubbleMapSpec will recalculate based on new text)
+          diagramStore.loadFromSpec(spec, diagramType)
+          
+          // Fit view after layout recalculation
+          setTimeout(() => fitDiagram(true), ANIMATION.FIT_DELAY)
+        } else {
+          // Fallback: just update node directly
+          diagramStore.updateNode(nodeId, { text })
+        }
+      } else {
+        // For other diagram types, just update node directly
+        diagramStore.updateNode(nodeId, { text })
+        
+        // Circle maps recalc layout from text; fit view so displayed size stays consistent
+        if (diagramType === 'circle_map') {
+          setTimeout(() => fitDiagram(true), ANIMATION.FIT_DELAY)
+        }
       }
     })
   )

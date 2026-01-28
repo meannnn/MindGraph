@@ -513,10 +513,10 @@ onUnmounted(() => {
 
 <style scoped>
 .inline-editable-text {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
   min-height: 1.5em;
   position: relative;
@@ -543,8 +543,8 @@ onUnmounted(() => {
   outline: none;
   font: inherit;
   color: inherit;
-  padding: 2px 4px;
-  margin: -2px -4px;
+  padding: 2px 0;
+  margin: -2px 0;
   border-radius: 4px;
   box-shadow: none;
   width: 100%;
@@ -555,6 +555,7 @@ onUnmounted(() => {
   z-index: 2;
   box-sizing: border-box;
   overflow: visible; /* Allow text to be visible */
+  text-align: center;
 }
 
 .inline-edit-input:focus {
@@ -598,6 +599,13 @@ onUnmounted(() => {
 .inline-edit-display {
   cursor: text;
   user-select: none;
+  width: 100%;
+  display: block;
+  text-align: center;
+  margin: 0 auto;
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
 }
 
 /* Truncate mode: single line with ellipsis */
