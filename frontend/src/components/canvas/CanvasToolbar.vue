@@ -131,6 +131,21 @@ function handleAddNode() {
 
   // For bubble_map and double_bubble_map, use useDiagramOperations
   if (diagramType === 'bubble_map' || diagramType === 'double_bubble_map') {
+    // Double bubble map: require selection to determine add type
+    if (diagramType === 'double_bubble_map') {
+      if (diagramStore.selectedNodes.length === 0) {
+        notify.warning('请选中需要添加的节点类型')
+        return
+      }
+      if (
+        diagramStore.selectedNodes.includes('left-topic') ||
+        diagramStore.selectedNodes.includes('right-topic')
+      ) {
+        notify.warning('不可添加主题词节点')
+        return
+      }
+    }
+
     const operations = getDiagramOperations()
     // Set diagram type and language to ensure operations are initialized correctly
     operations.setDiagramType(diagramType)
@@ -191,9 +206,23 @@ function handleAddNode() {
       spec.similarities = simNodes.map((n) => n.text)
       spec.leftDifferences = leftDiffNodes.map((n) => n.text)
       spec.rightDifferences = rightDiffNodes.map((n) => n.text)
+      spec._doubleBubbleMapNodeSizes = {
+        topicLeft: leftTopicNode?.style?.size != null ? leftTopicNode.style.size / 2 : undefined,
+        topicRight: rightTopicNode?.style?.size != null ? rightTopicNode.style.size / 2 : undefined,
+        similarities: simNodes.map((n) => (n.style?.size != null ? n.style.size / 2 : undefined)),
+        leftDifferences: leftDiffNodes.map((n) =>
+          n.style?.size != null ? n.style.size / 2 : undefined
+        ),
+        rightDifferences: rightDiffNodes.map((n) =>
+          n.style?.size != null ? n.style.size / 2 : undefined
+        ),
+      }
     }
 
-    const result = operations.operations.value.addNode(spec)
+    const result =
+      diagramType === 'double_bubble_map'
+        ? operations.operations.value.addNode(spec, undefined, diagramStore.selectedNodes[0])
+        : operations.operations.value.addNode(spec)
 
     if (result) {
       // Reload the spec to trigger layout recalculation
@@ -264,13 +293,13 @@ function handleDeleteNode() {
   if (diagramType === 'bubble_map' || diagramType === 'double_bubble_map') {
     // Check if any nodes are selected
     if (diagramStore.selectedNodes.length === 0) {
-      notify.warning('请选择需要删除的节点')
+      notify.warning('请选择要删除的节点')
       return
     }
 
     // Check if center node (topic) is selected for bubble_map
     if (diagramType === 'bubble_map' && diagramStore.selectedNodes.includes('topic')) {
-      notify.warning('主题词节点不可被删除')
+      notify.warning('不可以删除主题词节点')
       return
     }
 
@@ -280,7 +309,7 @@ function handleDeleteNode() {
       (diagramStore.selectedNodes.includes('left-topic') ||
         diagramStore.selectedNodes.includes('right-topic'))
     ) {
-      notify.warning('主题词节点不可被删除')
+      notify.warning('不可以删除主题词节点')
       return
     }
 
@@ -344,15 +373,42 @@ function handleDeleteNode() {
       spec.similarities = simNodes.map((n) => n.text)
       spec.leftDifferences = leftDiffNodes.map((n) => n.text)
       spec.rightDifferences = rightDiffNodes.map((n) => n.text)
+      spec._doubleBubbleMapNodeSizes = {
+        topicLeft: leftTopicNode?.style?.size != null ? leftTopicNode.style.size / 2 : undefined,
+        topicRight: rightTopicNode?.style?.size != null ? rightTopicNode.style.size / 2 : undefined,
+        similarities: simNodes.map((n) => (n.style?.size != null ? n.style.size / 2 : undefined)),
+        leftDifferences: leftDiffNodes.map((n) =>
+          n.style?.size != null ? n.style.size / 2 : undefined
+        ),
+        rightDifferences: rightDiffNodes.map((n) =>
+          n.style?.size != null ? n.style.size / 2 : undefined
+        ),
+      }
     }
 
-    // Filter out topic nodes from selectedNodes before deleting
-    const nodesToDelete =
-      diagramType === 'bubble_map'
-        ? diagramStore.selectedNodes.filter((id) => id !== 'topic')
-        : diagramStore.selectedNodes.filter(
-            (id) => id !== 'left-topic' && id !== 'right-topic'
-          )
+    // Filter out topic nodes; for double_bubble_map expand left/right-diff to delete pairs
+    let nodesToDelete: string[]
+    if (diagramType === 'bubble_map') {
+      nodesToDelete = diagramStore.selectedNodes.filter((id) => id !== 'topic')
+    } else {
+      // double_bubble_map: expand left-diff-i / right-diff-i to [left-diff-i, right-diff-i]
+      const expanded: string[] = []
+      for (const id of diagramStore.selectedNodes) {
+        if (id === 'left-topic' || id === 'right-topic') continue
+        const leftMatch = id.match(/^left-diff-(\d+)$/)
+        const rightMatch = id.match(/^right-diff-(\d+)$/)
+        if (leftMatch) {
+          const index = leftMatch[1]
+          expanded.push(id, `right-diff-${index}`)
+        } else if (rightMatch) {
+          const index = rightMatch[1]
+          expanded.push(`left-diff-${index}`, id)
+        } else {
+          expanded.push(id)
+        }
+      }
+      nodesToDelete = [...new Set(expanded)]
+    }
 
     if (nodesToDelete.length === 0) {
       // All selected nodes were topic nodes, already warned above

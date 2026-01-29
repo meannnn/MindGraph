@@ -1,12 +1,14 @@
 <script setup lang="ts">
 /**
- * CircleNode - Perfect circular node for Circle Maps
+ * CircleNode - Circular node for Circle/Bubble Maps; capsule for Double Bubble Map attributes
  * Size and fontSize come from layout (DOM-based); no truncation.
+ * Double bubble map uses capsule (pill) shape for attribute nodes; topic stays circle.
  * Supports inline text editing on double-click.
  * Text is centered via grid place-items: center.
  */
 import { computed, ref } from 'vue'
 
+import { DOUBLE_BUBBLE_MAX_CAPSULE_HEIGHT } from '@/composables/diagrams/layoutConfig'
 import { eventBus } from '@/composables/useEventBus'
 import { useTheme } from '@/composables/useTheme'
 import { calculateAdaptiveCircleSize } from '@/stores/specLoader/utils'
@@ -21,6 +23,10 @@ const { getNodeStyle } = useTheme({
 })
 
 const isTopicNode = computed(() => props.data.nodeType === 'topic')
+/** Double bubble map attribute nodes use capsule (pill) shape instead of circle */
+const isDoubleBubbleCapsule = computed(
+  () => props.data.diagramType === 'double_bubble_map' && !isTopicNode.value
+)
 const defaultStyle = computed(() => getNodeStyle(isTopicNode.value ? 'topic' : 'context'))
 
 const circleSize = computed(() => {
@@ -29,6 +35,12 @@ const circleSize = computed(() => {
   return calculateAdaptiveCircleSize(text, isTopicNode.value)
 })
 
+/** Capsule dimensions: 长度随文字，高度有上限 */
+const capsuleWidth = computed(() => Math.round(circleSize.value * 1.22))
+const capsuleHeight = computed(() =>
+  Math.min(Math.round(circleSize.value * 0.56), DOUBLE_BUBBLE_MAX_CAPSULE_HEIGHT)
+)
+
 const borderWidth = computed(
   () =>
     props.data.style?.borderWidth ??
@@ -36,28 +48,32 @@ const borderWidth = computed(
     (isTopicNode.value ? 3 : 2)
 )
 
-const nodeStyle = computed(() => ({
-  width: `${circleSize.value}px`,
-  height: `${circleSize.value}px`,
-  backgroundColor:
-    props.data.style?.backgroundColor ||
-    defaultStyle.value.backgroundColor ||
-    (isTopicNode.value ? '#1976d2' : '#e3f2fd'),
-  borderColor:
-    props.data.style?.borderColor ||
-    defaultStyle.value.borderColor ||
-    (isTopicNode.value ? '#0d47a1' : '#1976d2'),
-  color:
-    props.data.style?.textColor ||
-    defaultStyle.value.textColor ||
-    (isTopicNode.value ? '#ffffff' : '#333333'),
-  fontSize: `${props.data.style?.fontSize ?? defaultStyle.value.fontSize ?? (isTopicNode.value ? 20 : 14)}px`,
-  fontWeight:
-    props.data.style?.fontWeight ||
-    defaultStyle.value.fontWeight ||
-    (isTopicNode.value ? 'bold' : 'normal'),
-  borderWidth: `${borderWidth.value}px`,
-}))
+const nodeStyle = computed(() => {
+  const base = {
+    backgroundColor:
+      props.data.style?.backgroundColor ||
+      defaultStyle.value.backgroundColor ||
+      (isTopicNode.value ? '#1976d2' : '#e3f2fd'),
+    borderColor:
+      props.data.style?.borderColor ||
+      defaultStyle.value.borderColor ||
+      (isTopicNode.value ? '#0d47a1' : '#1976d2'),
+    color:
+      props.data.style?.textColor ||
+      defaultStyle.value.textColor ||
+      (isTopicNode.value ? '#ffffff' : '#333333'),
+    fontSize: `${props.data.style?.fontSize ?? defaultStyle.value.fontSize ?? (isTopicNode.value ? 20 : 14)}px`,
+    fontWeight:
+      props.data.style?.fontWeight ||
+      defaultStyle.value.fontWeight ||
+      (isTopicNode.value ? 'bold' : 'normal'),
+    borderWidth: `${borderWidth.value}px`,
+  }
+  if (isDoubleBubbleCapsule.value) {
+    return { ...base, width: `${capsuleWidth.value}px`, height: `${capsuleHeight.value}px` }
+  }
+  return { ...base, width: `${circleSize.value}px`, height: `${circleSize.value}px` }
+})
 
 const isEditing = ref(false)
 
@@ -77,6 +93,7 @@ function handleEditCancel() {
     :class="[
       isTopicNode ? 'cursor-default' : 'cursor-grab',
       isTopicNode ? 'topic-circle' : 'context-circle',
+      isDoubleBubbleCapsule ? 'circle-node-capsule' : '',
     ]"
     :style="nodeStyle"
   >
@@ -85,7 +102,7 @@ function handleEditCancel() {
         :text="data.label || ''"
         :node-id="id"
         :is-editing="isEditing"
-        :max-width="`${Math.max(0, circleSize - 16 - 2 * borderWidth)}px`"
+        :max-width="`${Math.max(0, (isDoubleBubbleCapsule ? capsuleWidth : circleSize) - 16 - 2 * borderWidth)}px`"
         text-align="center"
         :text-class="''"
         :no-wrap="data.diagramType === 'circle_map' || data.diagramType === 'bubble_map' || data.diagramType === 'double_bubble_map' ? true : !!data.style?.noWrap"
@@ -106,6 +123,11 @@ function handleEditCancel() {
     transform 0.2s ease;
   flex-shrink: 0;
   aspect-ratio: 1;
+}
+
+/* Double bubble map: capsule (pill) shape, no forced aspect-ratio */
+.circle-node-capsule {
+  aspect-ratio: auto;
 }
 
 /* Grid centering: text exactly at circle center */

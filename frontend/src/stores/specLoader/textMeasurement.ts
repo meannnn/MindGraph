@@ -18,6 +18,11 @@ export const CONTEXT_FONT_SIZE = 14
 /** Fixed font size for circle map topic node (never change; grow circle instead). */
 export const TOPIC_FONT_SIZE = 18
 
+/** Minimum radius for circle map topic (avoid too small when text is very short). */
+const MIN_TOPIC_RADIUS_CIRCLE_MAP = 60
+/** Inner padding inside topic circle (added after diagonal/2). */
+const TOPIC_CIRCLE_INNER_PADDING = 10
+
 let measureEl: HTMLDivElement | null = null
 
 function getMeasureEl(): HTMLDivElement {
@@ -324,4 +329,76 @@ export function calculateBubbleMapRadius(
   const radius = Math.ceil(diagonal / 2 + padding)
 
   return Math.max(minRadius, radius)
+}
+
+// Double bubble map: min radii and paddings per type (topic / similarity / difference)；贴合文字，内边距偏小
+const DOUBLE_BUBBLE_MIN_TOPIC_RADIUS = 32
+const DOUBLE_BUBBLE_MIN_SIM_RADIUS = 24
+const DOUBLE_BUBBLE_MIN_DIFF_RADIUS = 24
+const DOUBLE_BUBBLE_TOPIC_PADDING = 12
+const DOUBLE_BUBBLE_SIM_PADDING = 5
+const DOUBLE_BUBBLE_DIFF_PADDING = 5
+
+/**
+ * Required radius for one double-bubble node: measure text → diagonal/2 + padding; empty node uses saved radius.
+ * 量文字 → 算半径；空节点用保存的半径。
+ */
+export function doubleBubbleRequiredRadius(
+  text: string,
+  options: {
+    isTopic: boolean
+    savedRadius?: number
+  }
+): number {
+  const { isTopic, savedRadius } = options
+  const trimmed = (text || '').trim()
+  if (!trimmed) {
+    if (savedRadius != null && savedRadius > 0) return savedRadius
+    return isTopic ? DOUBLE_BUBBLE_MIN_TOPIC_RADIUS : DOUBLE_BUBBLE_MIN_SIM_RADIUS
+  }
+  const fontSize = isTopic ? TOPIC_FONT_SIZE : CONTEXT_FONT_SIZE
+  const padding = isTopic ? DOUBLE_BUBBLE_TOPIC_PADDING : DOUBLE_BUBBLE_SIM_PADDING
+  const minR = isTopic ? DOUBLE_BUBBLE_MIN_TOPIC_RADIUS : DOUBLE_BUBBLE_MIN_SIM_RADIUS
+  return calculateBubbleMapRadius(trimmed, fontSize, padding, minR, isTopic)
+}
+
+/** Required radius for difference node (left/right); empty uses savedRadius. */
+export function doubleBubbleDiffRequiredRadius(text: string, savedRadius?: number): number {
+  const trimmed = (text || '').trim()
+  if (!trimmed) {
+    if (savedRadius != null && savedRadius > 0) return savedRadius
+    return DOUBLE_BUBBLE_MIN_DIFF_RADIUS
+  }
+  return calculateBubbleMapRadius(
+    trimmed,
+    CONTEXT_FONT_SIZE,
+    DOUBLE_BUBBLE_DIFF_PADDING,
+    DOUBLE_BUBBLE_MIN_DIFF_RADIUS,
+    false
+  )
+}
+
+/**
+ * Circle map center (topic) radius from text: measure text at same font/size as render,
+ * use bounding box → radius = diagonal/2 + inner padding, with minimum radius.
+ * Uses invisible DOM measurement for accurate width/height.
+ *
+ * @param text - Topic text
+ * @returns Radius in pixels
+ */
+export function computeTopicRadiusForCircleMap(text: string): number {
+  const t = (text || '').trim() || ' '
+  if (typeof document === 'undefined') {
+    const len = t.length
+    const approxW = len * TOPIC_FONT_SIZE * 0.6
+    const approxH = TOPIC_FONT_SIZE * 1.4
+    const diagonal = Math.sqrt(approxW * approxW + approxH * approxH)
+    return Math.max(MIN_TOPIC_RADIUS_CIRCLE_MAP, Math.ceil(diagonal / 2 + TOPIC_CIRCLE_INNER_PADDING))
+  }
+  const { width, height } = measureTextWithSVG(t, TOPIC_FONT_SIZE, true)
+  const w = width || t.length * TOPIC_FONT_SIZE * 0.6
+  const h = height || TOPIC_FONT_SIZE * 1.4
+  const diagonal = Math.sqrt(w * w + h * h)
+  const radius = Math.ceil(diagonal / 2 + TOPIC_CIRCLE_INNER_PADDING)
+  return Math.max(MIN_TOPIC_RADIUS_CIRCLE_MAP, radius)
 }

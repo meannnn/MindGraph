@@ -14,6 +14,11 @@ import asyncio
 import multiprocessing
 import traceback
 import logging
+import time
+import socket
+import threading
+import urllib.request
+import urllib.error
 
 try:
     import uvicorn
@@ -52,7 +57,7 @@ from services.infrastructure.process.process_manager import (
     stop_postgresql_server,
     setup_signal_handlers
 )
-from services.infrastructure.utils.port_manager import ShutdownErrorFilter
+from services.infrastructure.utils.port_manager import ShutdownErrorFilter, find_process_on_port, cleanup_stale_process
 
 logger = logging.getLogger(__name__)
 
@@ -105,14 +110,8 @@ def run_server() -> None:
         print(f"Auto-reload: {reload}")
         print("Expected Capacity: 4,000+ concurrent SSE connections")
         print("=" * 80)
-        print(f"Server ready at: http://localhost:{port}")
-        print(f"API Docs: http://localhost:{port}/docs")
-        print()
-        print("Frontend (Vue SPA):")
-        print("  Development: Run 'npm run dev' in frontend/ → http://localhost:3000")
-        print(f"  Production:  Run 'npm run build' in frontend/ → http://localhost:{port}")
-        print("=" * 80)
-        print("Press Ctrl+C to stop the server")
+        print("Starting server...")
+        print("(Server will be ready after all dependencies are initialized)")
         print()
 
         # ========================================================================
@@ -265,12 +264,153 @@ def run_server() -> None:
 
             sys.excepthook = custom_excepthook
 
+            # 检查端口是否被占用
+            print(f"[DEBUG] Checking if port {port} is available...")
+            sys.stdout.flush()
+            pid_on_port = find_process_on_port(port)
+            if pid_on_port is not None:
+                print(f"[WARN] Port {port} is in use by process PID {pid_on_port}")
+                print(f"[INFO] Attempting to clean up stale process...")
+                sys.stdout.flush()
+                if cleanup_stale_process(pid_on_port, port):
+                    print(f"[INFO] Successfully cleaned up process {pid_on_port}")
+                    # 等待端口释放
+                    time.sleep(1)
+                else:
+                    print(f"[ERROR] Failed to clean up process {pid_on_port}")
+                    print(f"[ERROR] Please manually stop the process or use a different port")
+                    print(f"[ERROR] To stop manually: lsof -ti:{port} | xargs kill -9")
+                    sys.exit(1)
+
             print("[DEBUG] Starting Uvicorn server...")
             sys.stdout.flush()
 
             worker_count = 1 if reload else workers
             print(f"[DEBUG] Uvicorn configuration: host={host}, port={port}, workers={worker_count}, reload={reload}")
             sys.stdout.flush()
+
+            # 准备 reload 配置，避免文件系统循环
+            reload_kwargs = {}
+            if reload:
+                # 获取项目根目录（当前工作目录），确保是绝对路径
+                project_root = os.path.abspath(os.getcwd())
+                # 验证目录是否存在
+                if os.path.isdir(project_root):
+                    # 设置监控目录为项目根目录，排除有问题的子目录
+                    reload_dirs = [project_root]
+                    # 排除可能导致循环的目录
+                    reload_excludes = [
+                        "**/MindGraph-main/MindGraph-main",
+                        "**/node_modules/**",
+                        "**/.git/**",
+                        "**/__pycache__/**",
+                        "**/logs/**",
+                        "**/.pytest_cache/**",
+                    ]
+                    reload_kwargs = {
+                        "reload_dirs": reload_dirs,
+                        "reload_excludes": reload_excludes,
+                    }
+                    print(f"[DEBUG] Will watch for changes in these directories: {reload_dirs}")
+                    sys.stdout.flush()
+                else:
+                    print(f"[WARN] Project root directory does not exist: {project_root}")
+                    print("[WARN] Uvicorn will use default reload behavior (watch current directory)")
+                    sys.stdout.flush()
+
+            # Start a background thread to check server readiness and print message
+            def wait_and_print_ready():
+                """Wait for server to be ready and print ready message"""
+                # In reload mode, Uvicorn takes longer to start (needs to load modules)
+                max_attempts = 120 if reload else 60  # Wait up to 60 seconds in reload mode, 30 seconds otherwise
+                delay = 0.5
+                check_host = '127.0.0.1' if host == '0.0.0.0' else host
+                port_ready = False
+                
+                for attempt in range(max_attempts):
+                    try:
+                        # First check if port is open
+                        if not port_ready:
+                            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            sock.settimeout(0.5)
+                            result = sock.connect_ex((check_host, port))
+                            sock.close()
+                            
+                            if result == 0:
+                                port_ready = True
+                                # Port is open, now wait a bit for Uvicorn to fully initialize
+                                time.sleep(1)
+                            else:
+                                # Port not open yet, continue waiting
+                                time.sleep(delay)
+                                continue
+                        
+                        # Port is open, try health check
+                        try:
+                            health_url = f"http://{check_host}:{port}/health"
+                            response = urllib.request.urlopen(health_url, timeout=2)
+                            if response.getcode() == 200:
+                                # Server is ready!
+                                print()
+                                print("=" * 80)
+                                print(f"✓ Server ready at: http://localhost:{port}")
+                                print(f"✓ API Docs: http://localhost:{port}/docs")
+                                print()
+                                print("Frontend (Vue SPA):")
+                                print("  Development: Run 'npm run dev' in frontend/ → http://localhost:5173")
+                                print(f"  Production:  Run 'npm run build' in frontend/ → http://localhost:{port}")
+                                print("=" * 80)
+                                print("Press Ctrl+C to stop the server")
+                                print()
+                                sys.stdout.flush()
+                                return
+                        except urllib.error.HTTPError as e:
+                            # Got HTTP response but not 200, server is up but may have issues
+                            if e.code < 500:  # 4xx errors mean server is responding
+                                print()
+                                print("=" * 80)
+                                print(f"✓ Server started at: http://localhost:{port} (health check returned {e.code})")
+                                print(f"✓ API Docs: http://localhost:{port}/docs")
+                                print()
+                                print("Frontend (Vue SPA):")
+                                print("  Development: Run 'npm run dev' in frontend/ → http://localhost:5173")
+                                print(f"  Production:  Run 'npm run build' in frontend/ → http://localhost:{port}")
+                                print("=" * 80)
+                                print("Press Ctrl+C to stop the server")
+                                print()
+                                sys.stdout.flush()
+                                return
+                        except Exception:
+                            # Health check failed, but port is open, keep trying
+                            time.sleep(delay)
+                            continue
+                    except Exception:
+                        # Connection error, keep waiting
+                        time.sleep(delay)
+                        continue
+                
+                # If we get here, server didn't become ready in time
+                if port_ready:
+                    print()
+                    print("=" * 80)
+                    print(f"⚠ Server port {port} is open but health check timed out")
+                    print(f"✓ Server may be ready at: http://localhost:{port}")
+                    print(f"✓ API Docs: http://localhost:{port}/docs")
+                    print()
+                    print("Frontend (Vue SPA):")
+                    print("  Development: Run 'npm run dev' in frontend/ → http://localhost:5173")
+                    print(f"  Production:  Run 'npm run build' in frontend/ → http://localhost:{port}")
+                    print("=" * 80)
+                    print("Press Ctrl+C to stop the server")
+                    print()
+                else:
+                    print(f"[WARN] Server readiness check timed out after {max_attempts * delay} seconds")
+                    print(f"[INFO] Server may still be starting at: http://localhost:{port}")
+                sys.stdout.flush()
+
+            # Start the readiness checker thread
+            ready_thread = threading.Thread(target=wait_and_print_ready, daemon=True)
+            ready_thread.start()
 
             uvicorn.run(
                 "main:app",
@@ -285,6 +425,7 @@ def run_server() -> None:
                 timeout_graceful_shutdown=5,
                 access_log=False,
                 limit_concurrency=1000 if not reload else None,
+                **reload_kwargs,
             )
         except OSError as e:
             if e.errno == 98 or "Address already in use" in str(e) or "address is already in use" in str(e).lower():

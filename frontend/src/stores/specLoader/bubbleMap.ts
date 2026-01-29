@@ -115,13 +115,22 @@ function computeAttributeRadii(attributes: string[]): number[] {
 // 布局 / 力导向
 // ---------------------------------------------------------------------------
 
+/** 中心节点与周围气泡的最小间隙，避免重叠 */
+const MIN_GAP_TOPIC_BUBBLE = 15
+
 function calculateChildrenRadius(
   nodeCount: number,
   topicR: number,
   uniformAttributeR: number
 ): number {
+  // 中心到周围气泡中心的距离至少为 topicR + uniformAttributeR + 间隙，确保不重叠
+  const minRadiusNoOverlap = topicR + uniformAttributeR + MIN_GAP_TOPIC_BUBBLE
+
   // 目标距离：topicR + uniformAttributeR + 50，恢复到原来的3/4（比1/2大，但比原来小）
-  const targetDistance = (topicR + uniformAttributeR + 50) * 0.75
+  const targetDistance = Math.max(
+    minRadiusNoOverlap,
+    (topicR + uniformAttributeR + 50) * 0.75
+  )
 
   // 圆周约束：根据节点数动态调整 childrenRadius，避免过密
   // 使用适中的间距倍数（从原来的2.0-2.1减少到1.5-1.7）
@@ -132,9 +141,14 @@ function calculateChildrenRadius(
   // 优先使用 targetDistance，设置一个上限：不超过 targetDistance 的 1.5 倍
   const maxAllowedRadius = targetDistance * 1.5
   const effectiveCircumferentialRadius = Math.min(circumferentialMinRadius, maxAllowedRadius)
-  
-  // 使用两者中的较大值，但确保不会超过 maxAllowedRadius
-  return Math.max(targetDistance, Math.min(effectiveCircumferentialRadius, maxAllowedRadius), 30)
+
+  // 最终半径取较大值，且必须 >= minRadiusNoOverlap，保证周围气泡不与中心节点重叠
+  return Math.max(
+    targetDistance,
+    Math.min(effectiveCircumferentialRadius, maxAllowedRadius),
+    minRadiusNoOverlap,
+    30
+  )
 }
 
 function buildInitialTargets(
@@ -310,9 +324,17 @@ export function loadBubbleMapSpec(spec: Record<string, unknown>): SpecLoaderResu
     previousLayout && previousLayout.uniformAttributeR
       ? Math.abs(previousLayout.uniformAttributeR - uniformAttributeR) > 2
       : false
+  // 中心节点半径变化时也需重算：主题词文字长度变化导致 topicR 变化，中心应重绘、周围气泡距离需调整
+  const topicRadiusChangedSignificantly =
+    previousLayout && previousLayout.topicR != null
+      ? Math.abs(previousLayout.topicR - topicR) > 2
+      : false
 
   const shouldRecalculateLayout =
-    !hasAnyCustom || !hasCustomPositionsForAll || radiusChangedSignificantly
+    !hasAnyCustom ||
+    !hasCustomPositionsForAll ||
+    radiusChangedSignificantly ||
+    topicRadiusChangedSignificantly
 
   const nodes: DiagramNode[] = []
   const connections: Connection[] = []

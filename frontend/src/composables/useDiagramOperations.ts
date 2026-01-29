@@ -50,7 +50,7 @@ export interface DeleteNodeResult {
 }
 
 export interface DiagramOperations {
-  addNode: (spec: DiagramSpec, nodeType?: string) => AddNodeResult | null
+  addNode: (spec: DiagramSpec, nodeType?: string, selectedNodeId?: string) => AddNodeResult | null
   deleteNodes: (spec: DiagramSpec, nodeIds: string[]) => DeleteNodeResult | null
   updateNode: (spec: DiagramSpec, nodeId: string, updates: NodeUpdate) => boolean
   savePosition: (spec: DiagramSpec, nodeId: string, position: NodePosition) => boolean
@@ -320,10 +320,60 @@ export function useDiagramOperations(options: UseDiagramOperationsOptions = {}) 
     const type = effectiveType.value
 
     return {
-      addNode(spec: DiagramSpec, nodeType?: string): AddNodeResult | null {
+      addNode(spec: DiagramSpec, nodeType?: string, selectedNodeId?: string): AddNodeResult | null {
         if (!spec) return null
 
-        // Determine which node type to add
+        // Double bubble map: require selectedNodeId to determine add type
+        if (type === 'double_bubble_map') {
+          if (!selectedNodeId || selectedNodeId.trim() === '') return null
+          if (selectedNodeId === 'left-topic' || selectedNodeId === 'right-topic') return null
+
+          const specRecord = spec as Record<string, unknown>
+          if (selectedNodeId.match(/^similarity-\d+$/)) {
+            const similarities = specRecord.similarities
+            if (!Array.isArray(similarities)) return null
+            const newText = getDefaultText('similarity')
+            similarities.push(newText)
+            const index = similarities.length - 1
+            const newNodeId = `similarity-${index}`
+            eventBus.emit('diagram:node_added', {
+              diagramType: type,
+              nodeType: 'similarity',
+              nodeIndex: index,
+            })
+            eventBus.emit('diagram:operation_completed', {
+              operation: 'add_node',
+              details: { nodeId: newNodeId, nodeType: 'similarity' },
+            })
+            return { nodeId: newNodeId, nodeType: 'similarity', index }
+          }
+
+          if (selectedNodeId.match(/^left-diff-\d+$/) || selectedNodeId.match(/^right-diff-\d+$/)) {
+            const leftDifferences = specRecord.leftDifferences
+            const rightDifferences = specRecord.rightDifferences
+            if (!Array.isArray(leftDifferences) || !Array.isArray(rightDifferences)) return null
+            const leftText = getDefaultText('left_difference')
+            const rightText = getDefaultText('right_difference')
+            leftDifferences.push(leftText)
+            rightDifferences.push(rightText)
+            const index = leftDifferences.length - 1
+            const newNodeId = `left-diff-${index}`
+            eventBus.emit('diagram:node_added', {
+              diagramType: type,
+              nodeType: 'left_difference',
+              nodeIndex: index,
+            })
+            eventBus.emit('diagram:operation_completed', {
+              operation: 'add_node',
+              details: { nodeId: newNodeId, nodeType: 'left_difference' },
+            })
+            return { nodeId: newNodeId, nodeType: 'left_difference', index }
+          }
+
+          return null
+        }
+
+        // Determine which node type to add (other diagram types)
         const addType = nodeType || cfg.nodeTypes.find((t) => !cfg.protectedNodes.includes(t))
         if (!addType) return null
 
@@ -395,7 +445,12 @@ export function useDiagramOperations(options: UseDiagramOperationsOptions = {}) 
           if (!nodeInfo) continue
 
           if (cfg.protectedNodes.includes(nodeInfo.type)) {
-            warnings.push(`Cannot delete ${nodeInfo.type} node`)
+            warnings.push(
+              type === 'double_bubble_map' &&
+                (nodeInfo.type === 'topic1' || nodeInfo.type === 'topic2')
+                ? '不可以删除主题词节点'
+                : `Cannot delete ${nodeInfo.type} node`
+            )
             continue
           }
 
@@ -797,6 +852,16 @@ export function useDiagramOperations(options: UseDiagramOperationsOptions = {}) 
 
   function setDiagramType(type: DiagramType): void {
     diagramType.value = type
+    // Synchronously update operations so callers see them immediately (avoid "未初始化" on first use)
+    if (type) {
+      operations.value = createOperations()
+      eventBus.emit('diagram:operations_loaded', {
+        diagramType: type,
+        available: !!operations.value,
+      })
+    } else {
+      operations.value = null
+    }
   }
 
   function setLanguage(lang: string): void {

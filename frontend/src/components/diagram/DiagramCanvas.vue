@@ -484,6 +484,21 @@ onMounted(() => {
             spec.similarities = simNodes.map((n) => n.text)
             spec.leftDifferences = leftDiffNodes.map((n) => n.text)
             spec.rightDifferences = rightDiffNodes.map((n) => n.text)
+            spec._doubleBubbleMapNodeSizes = {
+              topicLeft:
+                leftTopicNode?.style?.size != null ? leftTopicNode.style.size / 2 : undefined,
+              topicRight:
+                rightTopicNode?.style?.size != null ? rightTopicNode.style.size / 2 : undefined,
+              similarities: simNodes.map((n) =>
+                n.style?.size != null ? n.style.size / 2 : undefined
+              ),
+              leftDifferences: leftDiffNodes.map((n) =>
+                n.style?.size != null ? n.style.size / 2 : undefined
+              ),
+              rightDifferences: rightDiffNodes.map((n) =>
+                n.style?.size != null ? n.style.size / 2 : undefined
+              ),
+            }
           }
           
           // Reload spec to trigger radius recalculation (loadBubbleMapSpec will recalculate based on new text)

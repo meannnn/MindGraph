@@ -14,6 +14,7 @@ import {
   computeFontSizeToFitCircle as measureFontSizeToFit,
   computeFontSizeToFitCircleNoWrap as measureFontSizeToFitNoWrap,
   computeMinDiameterForNoWrap,
+  computeTopicRadiusForCircleMap,
   CONTEXT_FONT_SIZE,
   TOPIC_FONT_SIZE,
 } from './textMeasurement'
@@ -30,13 +31,8 @@ export interface CircleMapLayoutResult {
   outerCircleR: number
 }
 
-/**
- * Topic diameter cap (max px) so overall circle map size stays stable.
- */
-export const TOPIC_SIZE_CAP_PX = 200
-
-/** Gap between topic and context ring (px). */
-const CIRCLE_MAP_TOPIC_CONTEXT_GAP = 8
+/** Gap between topic and context ring (px). Larger = more space between center and middle layer. */
+const CIRCLE_MAP_TOPIC_CONTEXT_GAP = 65
 /** Extra edge-to-edge gap between adjacent context circles (px). Second-layer spacing. */
 const CIRCLE_MAP_CONTEXT_GAP = 8
 /** Margin outside context ring for outer boundary (px). Keeps boundary clear of context circles. */
@@ -115,15 +111,9 @@ export function calculateCircleMapLayout(
   const centerX = DEFAULT_CENTER_X
   const centerY = DEFAULT_CENTER_Y
 
-  // (g) Topic first: fixed TOPIC_FONT_SIZE → topic diameter → topicR
-  const topicDiameter = Math.max(
-    DEFAULT_TOPIC_RADIUS * 2,
-    Math.min(
-      TOPIC_SIZE_CAP_PX,
-      computeMinDiameterForNoWrap(topicText || ' ', TOPIC_FONT_SIZE, true)
-    )
-  )
-  const topicR = topicDiameter / 2
+  // (g) Topic: text-adaptive radius = text bounding box diagonal/2 + inner padding, min only (no max)
+  const topicRFromText = computeTopicRadiusForCircleMap(topicText || ' ')
+  const topicR = Math.max(DEFAULT_TOPIC_RADIUS, topicRFromText)
 
   // (b) Uniform context R: fixed CONTEXT_FONT_SIZE → min diameter per text → max → radius
   let uniformContextR: number

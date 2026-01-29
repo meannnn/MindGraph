@@ -353,12 +353,26 @@ function getDiagramSpec(): Record<string, unknown> | null {
         return aIndex - bIndex
       })
 
+    const nodeSizes =
+      (diagramStore.data as Record<string, unknown>)._doubleBubbleMapNodeSizes ?? {
+        topicLeft: leftTopicNode?.style?.size != null ? leftTopicNode.style.size / 2 : undefined,
+        topicRight:
+          rightTopicNode?.style?.size != null ? rightTopicNode.style.size / 2 : undefined,
+        similarities: simNodes.map((n) => (n.style?.size != null ? n.style.size / 2 : undefined)),
+        leftDifferences: leftDiffNodes.map((n) =>
+          n.style?.size != null ? n.style.size / 2 : undefined
+        ),
+        rightDifferences: rightDiffNodes.map((n) =>
+          n.style?.size != null ? n.style.size / 2 : undefined
+        ),
+      }
     return {
       left: leftTopicNode?.text || '',
       right: rightTopicNode?.text || '',
       similarities: simNodes.map((n) => n.text),
       leftDifferences: leftDiffNodes.map((n) => n.text),
       rightDifferences: rightDiffNodes.map((n) => n.text),
+      _doubleBubbleMapNodeSizes: nodeSizes,
     }
   }
 
