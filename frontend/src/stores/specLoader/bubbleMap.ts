@@ -118,12 +118,18 @@ function computeAttributeRadii(attributes: string[]): number[] {
 /** 中心节点与周围气泡的最小间隙，避免重叠 */
 const MIN_GAP_TOPIC_BUBBLE = 15
 
+/**
+ * 计算外围属性节点所在圆的半径（中心到属性节点中心的距离）。
+ * 中心节点半径 topicR（由主题文字或保存值决定）直接决定内边界与外围距离：
+ * 外围节点中心到画布中心的距离必须 >= topicR + uniformAttributeR + 间隙，
+ * 从而整圈节点位置随 topicR 变化，且外围节点不与中心节点重叠。
+ */
 function calculateChildrenRadius(
   nodeCount: number,
   topicR: number,
   uniformAttributeR: number
 ): number {
-  // 中心到周围气泡中心的距离至少为 topicR + uniformAttributeR + 间隙，确保不重叠
+  // 内边界：中心到周围气泡中心的最小距离 = 中心半径 + 属性半径 + 间隙
   const minRadiusNoOverlap = topicR + uniformAttributeR + MIN_GAP_TOPIC_BUBBLE
 
   // 目标距离：topicR + uniformAttributeR + 50，恢复到原来的3/4（比1/2大，但比原来小）
@@ -287,8 +293,8 @@ export function loadBubbleMapSpec(spec: Record<string, unknown>): SpecLoaderResu
 
   const previousLayout = (spec._bubbleMapLayout || null) as BubbleMapLayoutMeta | null
 
-  // 文本驱动半径（topicR + 每个属性半径 → uniformAttributeR）
-  // 总是重新计算 topicR，因为 topic 文本可能已改变
+  // 中心节点：根据主题文字（或保存的半径）决定大小的圆，半径随文字长短或保存值变化
+  // topicR 直接决定外围属性节点到中心的距离和内边界，从而影响整圈节点的位置
   const topicR = computeTopicRadius(topic)
   const attributeRadii = computeAttributeRadii(attributes)
   let uniformAttributeR =
@@ -303,11 +309,12 @@ export function loadBubbleMapSpec(spec: Record<string, unknown>): SpecLoaderResu
     }
   }
 
-  // childrenRadius / centerX / centerY 计算
+  // 外围到中心的距离与内边界：由中心节点半径 topicR 直接决定，保证外围气泡不与中心重叠
   const childrenRadius = calculateChildrenRadius(nodeCount, topicR, uniformAttributeR)
   const padding = DEFAULT_PADDING
   const centerX = childrenRadius + uniformAttributeR + padding
   const centerY = childrenRadius + uniformAttributeR + padding
+  const minRadiusNoOverlap = topicR + uniformAttributeR + MIN_GAP_TOPIC_BUBBLE
 
   // 检测是否需要「重新布局并覆盖 _customPositions」
   let hasCustomPositionsForAll = true
@@ -356,6 +363,23 @@ export function loadBubbleMapSpec(spec: Record<string, unknown>): SpecLoaderResu
     // 迭代次数随节点数增长，避免大图过慢
     const iterations = 80 + nodeCount * 8
     runForceSimulation(simNodes, centerX, centerY, iterations)
+
+    // 后处理：保证外围节点中心到画布中心的距离 >= minRadiusNoOverlap，不与中心节点重叠
+    for (const n of simNodes) {
+      if (n.id === 'topic') continue
+      let cx = typeof n.x === 'number' ? n.x : n.targetX
+      let cy = typeof n.y === 'number' ? n.y : n.targetY
+      const dx = cx - centerX
+      const dy = cy - centerY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist > 0 && dist < minRadiusNoOverlap) {
+        const scale = minRadiusNoOverlap / dist
+        cx = centerX + dx * scale
+        cy = centerY + dy * scale
+        n.x = cx
+        n.y = cy
+      }
+    }
 
     // 将模拟结果转换为「左上角坐标」，写入 newPositions
     for (const n of simNodes) {
